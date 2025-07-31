@@ -10,7 +10,8 @@ const server = http.createServer(app);
 const io = socketio(server);
 app.use(express.static('public'));
 app.set("view engine", "ejs")
-app.set(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public")));
+
 
 io.on("connection", function (socket){
     socket.on("send-location", function (data){
@@ -21,8 +22,13 @@ io.on("connection", function (socket){
     })
 });
 
-app.get("/", function (req, res) {
-    res.render("index");
-});
+
+  app.get("/live", function (req, res) {
+    const role = req.query.role || "parent"; // Default to parent
+    res.render("index", { role });
+  });
+    
+
+
 
 server.listen(3000);

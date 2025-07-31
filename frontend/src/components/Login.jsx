@@ -1,4 +1,4 @@
-// Login.jsx with Strapi integration using auth table
+// Login.jsx with Strapi integration using auth table and CSS variables
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchDataFromApi, postDataToApi } from "../api/api";
@@ -15,7 +15,9 @@ const Login = () => {
     childRoll: "",
   });
   const navigate = useNavigate();
-
+ const handleDriverClick = () => {
+    navigate("/driver-login"); 
+  };
   const switchToRegister = () => setIsLogin(false);
   const switchToLogin = () => setIsLogin(true);
 
@@ -35,7 +37,7 @@ const Login = () => {
       );
       if (users && users.data && users.data.length > 0) {
         localStorage.setItem("user", JSON.stringify(users.data[0].email));
-        navigate("/");
+        navigate("/dashboard");
       } else {
         alert("Invalid login credentials");
       }
@@ -61,30 +63,38 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#1d2634] text-white flex flex-col items-center py-8">
-      <header className="flex items-center justify-between w-full px-8 py-4 shadow-md">
-        <a href="/" className="text-2xl font-semibold text-white">
-          TrackU
-        </a>
-      </header>
+    <div
+      className="min-h-screen w-full flex flex-col items-center py-8"
+      style={{ background: "var(--background)", color: "var(--text)" }}
+    >
+     <header className="navbar flex items-center justify-between w-full shadow-md">
+  <a href="/" className="text-2xl font-bold tracking-wide">
+    TrackNGo
+  </a>
+</header>
 
-      <div className="w-[360px] h-[600px] bg-[#263043] mt-6 rounded-[25px] p-5 relative overflow-hidden">
-        <div className="w-[220px] mx-auto relative shadow-[0_0_20px_9px_rgba(255,97,36,0.12)]">
+
+      <div
+        className="w-[360px] h-[600px] mt-6 rounded-[25px] p-5 relative overflow-hidden"
+        style={{ background: "var(--white)" }}
+      >
+        <div className="w-[220px] mx-auto relative shadow-[0_0_20px_9px_rgba(56,189,248,0.12)]">
           <div
-            className="absolute top-0 h-full w-[110px] bg-gradient-to-r from-[#ff105f] to-[#ffad06] rounded-[30px] transition-all duration-500"
-            style={{ left: isLogin ? "0px" : "110px" }}
+            className="absolute top-0 h-full w-[110px] rounded-[30px] transition-all duration-500"
+            style={{
+              left: isLogin ? "0px" : "110px",
+              background: "linear-gradient(to right, var(--primary), var(--tertiary))",
+            }}
           ></div>
           <button className="py-2 px-6 relative z-10" onClick={switchToLogin}>
             Log In
           </button>
-          <button
-            className="py-2 px-6 relative z-10"
-            onClick={switchToRegister}
-          >
+          <button className="py-2 px-6 relative z-10" onClick={switchToRegister}>
             Register
           </button>
         </div>
 
+        {/* Login Form */}
         <form
           onSubmit={handleLogin}
           className={`absolute w-[280px] mt-4 transition-all duration-500 top-[120px] ${
@@ -96,7 +106,8 @@ const Login = () => {
             name="email"
             value={loginData.email}
             onChange={handleLoginChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Email"
             required
           />
@@ -105,28 +116,34 @@ const Login = () => {
             name="password"
             value={loginData.password}
             onChange={handleLoginChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Password"
             required
           />
           <div className="my-4">
             <input type="checkbox" className="mr-2" required />
-            <span className="text-sm">
-              I agree to the terms and conditions.
-            </span>
+            <span className="text-sm">I agree to the terms and conditions.</span>
           </div>
-          <button className="w-[85%] py-2 px-4 bg-gradient-to-r from-[#ff105f] to-[#ffad06] rounded-[30px] mx-auto block">
+          <button
+            className="w-[85%] py-2 px-4 rounded-[30px] mx-auto block"
+            style={{
+              background: "linear-gradient(to right, var(--primary), var(--tertiary))",
+              color: "var(--text)",
+            }}
+          >
             Log In
           </button>
           <p className="mt-6 text-sm">Forgot Your Password?? No worry.</p>
-          <a href="#" className="text-blue-400 hover:text-green-300">
+          <a href="#" className="text-sm underline">
             Click here
           </a>
         </form>
 
+        {/* Register Form */}
         <form
           onSubmit={handleRegister}
-          className={`absolute w-[280px] transition-all mt-4 duration-500 top-[120px] ${
+          className={`absolute w-[280px] mt-4 transition-all duration-500 top-[120px] ${
             !isLogin ? "left-[50px]" : "left-[450px]"
           }`}
         >
@@ -135,7 +152,8 @@ const Login = () => {
             name="name"
             value={registerData.name}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Your Name"
             required
           />
@@ -144,7 +162,8 @@ const Login = () => {
             name="email"
             value={registerData.email}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Email address"
             required
           />
@@ -153,7 +172,8 @@ const Login = () => {
             name="password"
             value={registerData.password}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Password"
             required
           />
@@ -162,7 +182,8 @@ const Login = () => {
             name="childName"
             value={registerData.childName}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Child's Name"
             required
           />
@@ -171,7 +192,8 @@ const Login = () => {
             name="childClass"
             value={registerData.childClass}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Class"
             required
           />
@@ -180,30 +202,39 @@ const Login = () => {
             name="childRoll"
             value={registerData.childRoll}
             onChange={handleRegisterChange}
-            className="w-[91%] bg-transparent border-b border-gray-500 py-2 my-1 outline-none"
+            className="w-[91%] border-b py-2 my-1 outline-none"
+            style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Roll no."
             required
           />
           <div className="my-4">
             <input type="checkbox" className="mr-2" required />
-            <span className="text-sm">
-              I agree to the terms and conditions.
-            </span>
+            <span className="text-sm">I agree to the terms and conditions.</span>
           </div>
-          <button className="w-[85%] py-2 px-4 bg-gradient-to-r from-[#ff105f] to-[#ffad06] rounded-[30px] mx-auto block">
+          <button
+            className="w-[85%] py-2 px-4 rounded-[30px] mx-auto block"
+            style={{
+              background: "linear-gradient(to right, var(--primary), var(--tertiary))",
+              color: "var(--text)",
+            }}
+          >
             Register
           </button>
           <p className="mt-6 text-sm">Forgot Your Password?? No worry.</p>
-          <a href="#" className="text-blue-400 hover:text-green-300">
+          <a href="#" className="text-sm underline">
             Click here
           </a>
         </form>
 
         <button
-          className="mt-6 py-3 px-6 bg-gradient-to-r from-[#ff105f] to-[#ffad06] rounded-[30px] mx-auto block"
-          onClick={() => navigate("/employee")}
+          className="mt-6 py-3 px-6 rounded-[30px] mx-auto block"
+          onClick={() => navigate("/driver-login")}
+          style={{
+            background: "linear-gradient(to right, var(--primary), var(--tertiary))",
+            color: "var(--text)",
+          }}
         >
-          Continue as an employee.
+          Continue as driver.
         </button>
       </div>
     </div>

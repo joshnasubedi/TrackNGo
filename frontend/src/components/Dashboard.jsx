@@ -32,15 +32,6 @@ const Dashboard = () => {
 
   return (
     <div className="page-container" style={{ display: "flex", minHeight: "100vh", background: "var(--background)", color: "var(--text)" }}>
-      <aside className="sidebar">
-        <h2>🚍 TrackMyBus</h2>
-        <a href="#">🏠 Dashboard</a>
-        <a href="#">🚌 Bus Routes</a>
-        <a href="#">👨‍✈️ Drivers</a>
-        <a href="#">📍 Live Map</a>
-        <a href="#">⚙️ Settings</a>
-        <a href="#">🚪 Logout</a>
-      </aside>
 
       <main className="main">
         <nav className="navbar">

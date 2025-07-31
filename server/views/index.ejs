@@ -1,18 +1,151 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>trackngo</title>
-    <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TrackNGo</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
-    <div id="map"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-        <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" crossorigin="anonymous"></script>
-        <script src="/js/script.js"></script>
-    
-    
+  <div id="map"></div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+
+  <script>
+    const USER_ROLE = "<%= role %>"; // Injected by server
+    console.log("USER_ROLE:", USER_ROLE); 
+  </script>
+
+  <script>
+    const socket = io();
+    console.log("Socket connected with ID:", socket.id);
+
+    const map = L.map('map').setView([27.7007, 85.3001], 14);
+
+    // Tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Custom Icons
+    const busIcon = L.icon({
+      iconUrl: "/img/bus.png",
+      iconSize: [70, 70],
+      iconAnchor: [35, 70],
+      popupAnchor: [0, -70]
+    });
+
+    const sourceIcon = L.icon({
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+      iconSize: [35, 35],
+      iconAnchor: [17, 35]
+    });
+
+    const destIcon = L.icon({
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/447/447031.png",
+      iconSize: [35, 35],
+      iconAnchor: [17, 35]
+    });
+
+    const pickupIcon = L.icon({
+      iconUrl: "/assets/pickup.jpeg", 
+      iconSize: [70, 70],
+      iconAnchor: [35, 70],
+      popupAnchor: [0, -70]
+    });
+
+    // Add fixed pickup points
+    const pickupPoints = [
+      { lat: 27.7050, lng: 85.3100 },
+      { lat: 27.6980, lng: 85.2950 }
+    ];
+
+    pickupPoints.forEach((point, index) => {
+      L.marker([point.lat, point.lng], { icon: pickupIcon })
+        .addTo(map)
+        .bindPopup(Pickup Point ${index + 1});
+    });
+
+    // Track all bus markers
+    const markers = {};
+    let routingControl = null;
+    let sourceMarker = null;
+    let destMarker = null;
+
+    // Draw route from bus to clicked location
+    map.on('click', function (e) {
+      const destination = L.latLng(e.latlng.lat, e.latlng.lng);
+      const busIds = Object.keys(markers);
+
+      if (busIds.length === 0) return;
+
+      const busLatLng = markers[busIds[0]].getLatLng();
+
+      // Clear previous route and markers
+      if (routingControl) map.removeControl(routingControl);
+      if (sourceMarker) map.removeLayer(sourceMarker);
+      if (destMarker) map.removeLayer(destMarker);
+
+      sourceMarker = L.marker(busLatLng, { icon: sourceIcon }).addTo(map).bindPopup("Bus Location").openPopup();
+      destMarker = L.marker(destination, { icon: destIcon }).addTo(map).bindPopup("Destination").openPopup();
+
+      routingControl = L.Routing.control({
+        waypoints: [busLatLng, destination],
+        createMarker: () => null,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        routeWhileDragging: false,
+        show: false
+      }).addTo(map);
+    });
+
+    // Handle live driver location updates
+    socket.on("receive-location", (data) => {
+      console.log("Received driver location:", data);
+
+      const { id, latitude, longitude } = data;
+      const latlng = [latitude, longitude];
+
+      if (markers[id]) {
+        markers[id].setLatLng(latlng);
+      } else {
+        markers[id] = L.marker(latlng, { icon: busIcon }).addTo(map).bindPopup("Bus");
+      }
+
+      map.setView(latlng, map.getZoom());
+    });
+
+    // Handle user disconnects
+    socket.on("user-disconnected", (id) => {
+      if (markers[id]) {
+        map.removeLayer(markers[id]);
+        delete markers[id];
+      }
+    });
+
+    // If driver, start emitting location
+    if (USER_ROLE === "driver" && navigator.geolocation) {
+      console.log("Driver detected: Starting location tracking...");
+      navigator.geolocation.watchPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        socket.emit("send-location", { latitude, longitude });
+      });
+    }
+  </script>
 </body>
 </html>

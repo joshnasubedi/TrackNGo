@@ -5,7 +5,9 @@
     --text: #1e293b;
     --white: #ffffff;
   }
-  
+
+
+
   * {
     margin: 0;
     padding: 0;
@@ -13,16 +15,17 @@
     font-family: 'Segoe UI', sans-serif;
   }
   
-  .page-container {
+  .layout-container {
     display: flex;
     min-height: 100vh;
     background: var(--background);
     color: var(--text);
       width: 100vw; 
   }
-  
+ 
+
   /* Sidebar inside page-container */
-  .page-container .sidebar {
+  .layout-container .sidebar {
     width: 240px;
     background-color: var(--primary);
     color: white;
@@ -33,7 +36,7 @@
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
   }
   
-  .page-container .sidebar h2 {
+  .layout-container .sidebar h2 {
     text-align: center;
     font-size: 1.6rem;
     margin-bottom: 1rem;
@@ -41,7 +44,7 @@
     color: white;
   }
   
-  .page-container .sidebar a {
+  .layout-container .sidebar a {
     text-decoration: none;
     color: white;
     padding: 0.6rem 1rem;
@@ -53,13 +56,13 @@
     gap: 0.5rem;
   }
   
-  .page-container .sidebar a:hover {
+  .layout-container .sidebar a:hover {
     background-color: var(--tertiary);
     color: var(--text);
   }
   
   /* Main content */
-  .page-container .main {
+  .layout-container .main {
     flex: 1;
     display: flex;
     width: 100%;
@@ -136,10 +139,65 @@
     font-weight: bold;
     color: var(--text);
   }
+
+/* drivers sidebar layout */
+  .driverlayout-container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--text);
+      width: 100vw; 
+  }
+ 
+
+  /* Sidebar inside page-container */
+  .driverlayout-container .sidebar {
+    width: 240px;
+    background-color: var(--primary);
+    color: white;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+  }
   
+  .driverlayout-container .sidebar h2 {
+    text-align: center;
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    color: white;
+  }
+  
+  .driverlayout-container .sidebar a {
+    text-decoration: none;
+    color: white;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .driverlayout-container .sidebar a:hover {
+    background-color: var(--tertiary);
+    color: var(--text);
+  }
+  
+  /* Main content */
+  .driverlayout-container .main {
+    flex: 1;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+  }
+
   /* Responsive */
-  @media (max-width: 768px) {
+  /* @media (max-width: 768px) {
     .page-container .sidebar {
       display: none;
     }
-  }
+  } */
