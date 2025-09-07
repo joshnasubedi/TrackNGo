@@ -2,6 +2,10 @@ const express = require("express");
 const app = express();
 const path = require("path");
 const http = require("http");
+//added
+const graph = require("./graph");
+const dijkstra = require("./dijkstra");
+//added
 
 const socketio = require("socket.io");
 
@@ -28,7 +32,20 @@ io.on("connection", function (socket){
     res.render("index", { role });
   });
     
+//added
+// API to get shortest path between two nodes
+app.get("/shortest-path", (req, res) => {
+  const { start, end } = req.query;
 
+  if (!graph[start] || !graph[end]) {
+    return res.status(400).json({ error: "Invalid nodes" });
+  }
+
+  const result = dijkstra(graph, start, end);
+  res.json(result);
+});
+
+//added
 
 
 server.listen(3000);
