@@ -69,50 +69,154 @@
       popupAnchor: [0, -70]
     });
 
-    // Add fixed pickup points
-    const pickupPoints = [
-      { lat: 27.7050, lng: 85.3100 },
-      { lat: 27.6980, lng: 85.2950 }
-    ];
+    
+//-----------old
+// Add fixed pickup points
+    // const pickupPoints = [
+    //   { lat: 27.7050, lng: 85.3100 },
+    //   { lat: 27.6980, lng: 85.2950 }
+    // ];
+    // pickupPoints.forEach((point, index) => {
+    //   L.marker([point.lat, point.lng], { icon: pickupIcon })
+    //     .addTo(map)
+    //     .bindPopup(Pickup Point ${index + 1});
+    // });
+//--------
 
+//new--------
     pickupPoints.forEach((point, index) => {
-      L.marker([point.lat, point.lng], { icon: pickupIcon })
-        .addTo(map)
-        .bindPopup(Pickup Point ${index + 1});
-    });
+  L.marker([point.lat, point.lng], { icon: pickupIcon })
+    .addTo(map)
+    .bindPopup(`Pickup Point ${index + 1}`);
+});
 
+//--------------
     // Track all bus markers
     const markers = {};
     let routingControl = null;
     let sourceMarker = null;
     let destMarker = null;
 
+    // previous code
     // Draw route from bus to clicked location
-    map.on('click', function (e) {
-      const destination = L.latLng(e.latlng.lat, e.latlng.lng);
-      const busIds = Object.keys(markers);
+    // map.on('click', function (e) {
+    //   const destination = L.latLng(e.latlng.lat, e.latlng.lng);
+    //   const busIds = Object.keys(markers);
 
-      if (busIds.length === 0) return;
+    //   if (busIds.length === 0) return;
 
-      const busLatLng = markers[busIds[0]].getLatLng();
+    //   const busLatLng = markers[busIds[0]].getLatLng();
 
-      // Clear previous route and markers
-      if (routingControl) map.removeControl(routingControl);
-      if (sourceMarker) map.removeLayer(sourceMarker);
-      if (destMarker) map.removeLayer(destMarker);
+    //   // Clear previous route and markers
+    //   if (routingControl) map.removeControl(routingControl);
+    //   if (sourceMarker) map.removeLayer(sourceMarker);
+    //   if (destMarker) map.removeLayer(destMarker);
 
-      sourceMarker = L.marker(busLatLng, { icon: sourceIcon }).addTo(map).bindPopup("Bus Location").openPopup();
-      destMarker = L.marker(destination, { icon: destIcon }).addTo(map).bindPopup("Destination").openPopup();
+    //   sourceMarker = L.marker(busLatLng, { icon: sourceIcon }).addTo(map).bindPopup("Bus Location").openPopup();
+    //   destMarker = L.marker(destination, { icon: destIcon }).addTo(map).bindPopup("Destination").openPopup();
 
-      routingControl = L.Routing.control({
-        waypoints: [busLatLng, destination],
-        createMarker: () => null,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        routeWhileDragging: false,
-        show: false
-      }).addTo(map);
-    });
+    //   routingControl = L.Routing.control({
+    //     waypoints: [busLatLng, destination],
+    //     createMarker: () => null,
+    //     addWaypoints: false,
+    //     draggableWaypoints: false,
+    //     routeWhileDragging: false,
+    //     show: false
+    //   }).addTo(map);
+    // });
+
+    //new added code 
+    //--------------------------
+// Pickup points and helper function
+const pickupPoints = [
+  { id: "A", lat: 27.7050, lng: 85.3100 },
+  { id: "B", lat: 27.6980, lng: 85.2950 },
+  { id: "C", lat: 27.7007, lng: 85.3001 },
+  { id: "D", lat: 27.6950, lng: 85.3050 }
+];
+
+function findNearestNode(latlng) {
+  let nearest = pickupPoints[0];
+  let minDist = Infinity;
+
+  pickupPoints.forEach(p => {
+    const dist = latlng.distanceTo([p.lat, p.lng]);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = p;
+    }
+  });
+
+  return nearest.id;
+}
+
+    // Draw route from bus to clicked location using Dijkstra
+map.on('click', async function (e) {
+  const destination = L.latLng(e.latlng.lat, e.latlng.lng);
+  const busIds = Object.keys(markers);
+
+  if (busIds.length === 0) return;
+
+  const busLatLng = markers[busIds[0]].getLatLng();
+
+  // Clear previous route and markers
+  if (routingControl) {
+    map.removeControl(routingControl);
+    routingControl = null;
+  }
+  if (sourceMarker) map.removeLayer(sourceMarker);
+  if (destMarker) map.removeLayer(destMarker);
+
+  // Markers
+  sourceMarker = L.marker(busLatLng, { icon: sourceIcon })
+    .addTo(map)
+    .bindPopup("Bus Location")
+    .openPopup();
+  destMarker = L.marker(destination, { icon: destIcon })
+    .addTo(map)
+    .bindPopup("Destination")
+    .openPopup();
+
+  try {
+    // For demo: map bus to node "A" and clicked point to node "D"
+    //old--------------------
+    // const start = "A";
+    // const end = "D";
+    //--------------------
+//new add 
+//----------
+const start = findNearestNode(busLatLng);
+const end = findNearestNode(destination);
+//-------
+    const response = await fetch(`/shortest-path?start=${start}&end=${end}`);
+    const data = await response.json();
+
+    console.log("Shortest Path:", data);
+
+    if (data.path && data.path.length > 0) {
+      // Convert graph nodes -> lat/lng
+      //old------------------
+      // const coords = data.path.map(node => {
+      //   if (node === "A") return [27.7050, 85.3100]; // Pickup 1
+      //   if (node === "B") return [27.6980, 85.2950]; // Pickup 2
+      //   if (node === "C") return [27.7007, 85.3001]; // Midpoint
+      //   if (node === "D") return [27.6950, 85.3050]; // Destination
+      //--------------------
+      //new------------------------
+      const coords = data.path.map(node => {
+  const p = pickupPoints.find(pt => pt.id === node);
+  return [p.lat, p.lng];
+      //-----------------------------
+      });
+
+      // Draw polyline for Dijkstra path
+      L.polyline(coords, { color: "blue", weight: 5 }).addTo(map);
+    }
+  } catch (err) {
+    console.error("Error fetching shortest path:", err);
+  }
+});
+//---------------------------------------------------------
 
     // Handle live driver location updates
     socket.on("receive-location", (data) => {
