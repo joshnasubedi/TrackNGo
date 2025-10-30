@@ -95,7 +95,7 @@ const DriverMap = () => {
     return R * c; // Distance in km
   };
 
-  // Function to calculate route using Dijkstra
+  // Function to calculate route using ACTUAL ROADS
   const calculateRouteToPoint = async (pointIndex) => {
     // Check if there's already an active route
     if (routeLineRef.current) {
@@ -110,10 +110,13 @@ const DriverMap = () => {
 
     try {
       const driverLatLng = driverMarkerRef.current.getLatLng();
-      console.log("📍 Calculating route from:", driverLatLng, "to point:", pointIndex);
+      console.log("📍 Calculating ROAD route from:", driverLatLng, "to point:", pointIndex);
       
+      const targetPoint = PICKUP_POINTS[pointIndex];
+      
+      // Use the road routing endpoint
       const response = await fetch(
-        `http://localhost:5001/api/shortest-route?driverLat=${driverLatLng.lat}&driverLng=${driverLatLng.lng}&targetIndex=${pointIndex}`
+        `http://localhost:5001/api/road-route?driverLat=${driverLatLng.lat}&driverLng=${driverLatLng.lng}&targetLat=${targetPoint.lat}&targetLng=${targetPoint.lng}`
       );
       
       if (!response.ok) {
@@ -121,28 +124,55 @@ const DriverMap = () => {
       }
       
       const routeData = await response.json();
-      console.log("🗺️ Route data received:", routeData);
+      console.log("🛣️ Road route data received:", routeData);
       
       if (routeData.error) {
         throw new Error(routeData.error);
       }
       
-      // Create new route line (blue dashed line)
-      const newRouteLine = L.polyline(routeData.path, {
+      // Remove existing route line
+      if (routeLineRef.current) {
+        mapInstanceRef.current.removeLayer(routeLineRef.current);
+      }
+      
+      // Create new route line with different style for road vs straight line
+      const routeStyle = routeData.roadDistance ? {
         color: '#2563eb',
         weight: 6,
         opacity: 0.8,
-        dashArray: '10, 10',
         lineJoin: 'round'
-      }).addTo(mapInstanceRef.current);
+      } : {
+        color: '#ef4444',
+        weight: 4,
+        opacity: 0.6,
+        dashArray: '5, 10',
+        lineJoin: 'round'
+      };
+      
+      const newRouteLine = L.polyline(routeData.path, routeStyle).addTo(mapInstanceRef.current);
+      
+      // Add route info popup
+      newRouteLine.bindPopup(`
+        <div style="text-align: center; min-width: 200px;">
+          <b>${routeData.roadDistance ? '🛣️ Road Route' : '📏 Straight Line'}</b><br>
+          To: <strong>${targetPoint.name}</strong><br>
+          Distance: <strong>${routeData.distance} km</strong><br>
+          Est. Time: <strong>${routeData.duration} min</strong><br>
+          <small style="color: #6b7280;">
+            ${routeData.roadDistance ? 'Actual road path' : 'Direct line (no roads)'}
+          </small>
+        </div>
+      `);
       
       // Store the route line in ref
       routeLineRef.current = newRouteLine;
       setRouteInfo({
         distance: routeData.distance,
-        to: PICKUP_POINTS[pointIndex].name,
-        targetCoords: { lat: PICKUP_POINTS[pointIndex].lat, lng: PICKUP_POINTS[pointIndex].lng },
-        pointIndex: pointIndex
+        duration: routeData.duration,
+        to: targetPoint.name,
+        targetCoords: { lat: targetPoint.lat, lng: targetPoint.lng },
+        pointIndex: pointIndex,
+        isRoadRoute: routeData.roadDistance
       });
       
       // Reset states
@@ -156,8 +186,9 @@ const DriverMap = () => {
       // Fit map to show entire route
       mapInstanceRef.current.fitBounds(newRouteLine.getBounds());
       
-      setStatus(`🚗 Driving to ${PICKUP_POINTS[pointIndex].name}...`);
-      console.log(`📍 Route to ${PICKUP_POINTS[pointIndex].name}: ${routeData.distance} km`);
+      const routeType = routeData.roadDistance ? "road route" : "straight line";
+      setStatus(`🚗 Driving to ${targetPoint.name} via ${routeType}...`);
+      console.log(`🛣️ ${routeData.roadDistance ? 'Road' : 'Straight'} route to ${targetPoint.name}: ${routeData.distance} km`);
       
     } catch (error) {
       console.error("❌ Route calculation error:", error);
@@ -455,11 +486,14 @@ const DriverMap = () => {
         
         {/* Active Route Display */}
         {routeInfo && !destinationReached && (
-          <div className="bg-blue-500 text-white p-3 rounded-lg mt-3">
-            <h3 className="text-lg font-bold mb-1">🗺️ Active Route</h3>
+          <div className={`${routeInfo.isRoadRoute ? 'bg-blue-500' : 'bg-orange-500'} text-white p-3 rounded-lg mt-3`}>
+            <h3 className="text-lg font-bold mb-1">
+              {routeInfo.isRoadRoute ? '🛣️ Road Route' : '📏 Direct Route'}
+            </h3>
             <p className="text-sm">
               To: <strong>{routeInfo.to}</strong><br/>
-              Distance: <strong>{routeInfo.distance} km</strong>
+              Distance: <strong>{routeInfo.distance} km</strong><br/>
+              Time: <strong>{routeInfo.duration} min</strong><br/>
             </p>
             <button 
               onClick={completePickup}

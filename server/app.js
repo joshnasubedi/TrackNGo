@@ -154,6 +154,63 @@ app.get("/shortest-path", (req, res) => {
   }
 });
 
+// Add this new route for actual road routing
+app.get("/api/road-route", async (req, res) => {
+  try {
+    const { driverLat, driverLng, targetLat, targetLng } = req.query;
+    
+    if (!driverLat || !driverLng || !targetLat || !targetLng) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
+
+    // Use OSRM (Open Source Routing Machine) for real road routing
+    const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${driverLng},${driverLat};${targetLng},${targetLat}?overview=full&geometries=geojson`;
+    
+    console.log("🛣️ Fetching road route from OSRM:", osrmUrl);
+    
+    const response = await fetch(osrmUrl);
+    const routeData = await response.json();
+
+    if (routeData.code !== 'Ok') {
+      throw new Error('OSRM routing failed: ' + routeData.message);
+    }
+
+    // Extract the actual road path
+    const roadPath = routeData.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng,lat] to [lat,lng]
+    const distance = (routeData.routes[0].distance / 1000).toFixed(2); // Convert meters to km
+
+    const result = {
+      distance: distance,
+      path: roadPath,
+      duration: (routeData.routes[0].duration / 60).toFixed(1), // minutes
+      roadDistance: true // Flag to indicate this is actual road distance
+    };
+
+    console.log(`🛣️ Road route calculated: ${distance} km, ${result.duration} min`);
+    res.json(result);
+
+  } catch (err) {
+    console.error("❌ OSRM routing error:", err);
+    
+    // Fallback to straight line if OSRM fails
+    const driverLat = parseFloat(req.query.driverLat);
+    const driverLng = parseFloat(req.query.driverLng);
+    const targetLat = parseFloat(req.query.targetLat);
+    const targetLng = parseFloat(req.query.targetLng);
+    
+    const distance = calculateDistance(driverLat, driverLng, targetLat, targetLng);
+    
+    const result = {
+      distance: distance.toFixed(2),
+      path: [[driverLat, driverLng], [targetLat, targetLng]],
+      duration: (distance * 2).toFixed(1), // Rough estimate: 2 min per km
+      roadDistance: false // Flag to indicate this is straight line
+    };
+    
+    console.log("🔄 Using fallback straight line route");
+    res.json(result);
+  }
+});
 // API to get optimal route (greedy + Dijkstra combo)
 app.get("/optimal-route", (req, res) => {
   try {
