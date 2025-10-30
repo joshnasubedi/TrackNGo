@@ -1,114 +1,124 @@
-function buildGraph(school, pickupPoints) {
-  const nodes = [school, ...pickupPoints];
-  const graph = {};
+// dijkstra.js
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+}
 
-  for (let i = 0; i < nodes.length; i++) {
-    graph[i] = {};
-    for (let j = 0; j < nodes.length; j++) {
-      if (i !== j) {
-        const distance = getDistance(
-          nodes[i].lat,
-          nodes[i].lng,
-          nodes[j].lat,
-          nodes[j].lng
-        );
-        graph[i][j] = distance;
-      }
+function buildGraphWithDriver(driverLocation, pickupPoints) {
+  const nodes = ['driver', ...pickupPoints.map((_, i) => `point${i}`)];
+  const graph = {};
+  
+  // Initialize graph
+  nodes.forEach(node => {
+    graph[node] = {};
+  });
+  
+  // Add edges from driver to all pickup points
+  pickupPoints.forEach((point, i) => {
+    const distance = calculateDistance(
+      driverLocation.lat, driverLocation.lng,
+      point.lat, point.lng
+    );
+    graph['driver'][`point${i}`] = distance;
+    graph[`point${i}`]['driver'] = distance;
+  });
+  
+  // Add edges between pickup points
+  for (let i = 0; i < pickupPoints.length; i++) {
+    for (let j = i + 1; j < pickupPoints.length; j++) {
+      const distance = calculateDistance(
+        pickupPoints[i].lat, pickupPoints[i].lng,
+        pickupPoints[j].lat, pickupPoints[j].lng
+      );
+      graph[`point${i}`][`point${j}`] = distance;
+      graph[`point${j}`][`point${i}`] = distance;
     }
   }
+  
   return { graph, nodes };
 }
 
-function dijkstra(graph, start, end) {
+function dijkstra(graph, start) {
   const distances = {};
-  const visited = {};
   const previous = {};
-
-  Object.keys(graph).forEach((node) => {
+  const nodes = new Set();
+  
+  // Initialize
+  Object.keys(graph).forEach(node => {
     distances[node] = Infinity;
     previous[node] = null;
+    nodes.add(node);
   });
   distances[start] = 0;
-
-  while (true) {
-    let currentNode = null;
-    let minDistance = Infinity;
-
-    for (let node in distances) {
-      if (!visited[node] && distances[node] < minDistance) {
-        minDistance = distances[node];
-        currentNode = node;
+  
+  while (nodes.size > 0) {
+    // Find node with smallest distance
+    let closestNode = null;
+    for (const node of nodes) {
+      if (closestNode === null || distances[node] < distances[closestNode]) {
+        closestNode = node;
       }
     }
-
-    if (currentNode === null || currentNode === end) break;
-    visited[currentNode] = true;
-
-    for (let neighbor in graph[currentNode]) {
-      const total = distances[currentNode] + graph[currentNode][neighbor];
-      if (total < distances[neighbor]) {
-        distances[neighbor] = total;
-        previous[neighbor] = currentNode;
+    
+    if (distances[closestNode] === Infinity) break;
+    
+    nodes.delete(closestNode);
+    
+    // Update neighbors
+    for (const neighbor in graph[closestNode]) {
+      const alt = distances[closestNode] + graph[closestNode][neighbor];
+      if (alt < distances[neighbor]) {
+        distances[neighbor] = alt;
+        previous[neighbor] = closestNode;
       }
     }
   }
+  
+  return { distances, previous };
+}
 
+function getShortestRoute(driverLocation, pickupPoints, targetPointIndex) {
+  const { graph, nodes } = buildGraphWithDriver(driverLocation, pickupPoints);
+  const { distances, previous } = dijkstra(graph, 'driver');
+  
+  const targetNode = `point${targetPointIndex}`;
+  const distance = distances[targetNode];
+  
+  // Build path
   const path = [];
-  let node = end;
-  while (node !== null) {
-    path.unshift(node);
-    node = previous[node];
+  let current = targetNode;
+  while (current !== null) {
+    path.unshift(current);
+    current = previous[current];
   }
-
-  return { path, distance: distances[end] };
-}
-
-// Distance formula
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // km
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(deg2rad(lat1)) *
-      Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function deg2rad(deg) {
-  return deg * (Math.PI / 180);
-}
-
-function findOptimalRoute(school, pickupPoints) {
-  const { graph, nodes } = buildGraph(school, pickupPoints);
-  const route = [];
-  let totalDistance = 0;
-
-  let currentIndex = 0;
-  const visited = new Set();
-  route.push(nodes[currentIndex]);
-
-  while (visited.size < pickupPoints.length) {
-    let nearest = null;
-    let minDist = Infinity;
-    for (let i = 1; i < nodes.length; i++) {
-      if (!visited.has(i) && graph[currentIndex][i] < minDist) {
-        nearest = i;
-        minDist = graph[currentIndex][i];
-      }
+  
+  // Convert path to coordinates
+  const coordinates = path.map(node => {
+    if (node === 'driver') {
+      return [driverLocation.lat, driverLocation.lng];
+    } else {
+      const index = parseInt(node.replace('point', ''));
+      return [pickupPoints[index].lat, pickupPoints[index].lng];
     }
-    visited.add(nearest);
-    route.push(nodes[nearest]);
-    totalDistance += minDist;
-    currentIndex = nearest;
-  }
-
-  totalDistance += graph[currentIndex][0];
-  route.push(nodes[0]);
-
-  return { route, totalDistance: totalDistance.toFixed(2) };
+  });
+  
+  return {
+    distance: distance.toFixed(2),
+    path: coordinates,
+    waypoints: path
+  };
 }
 
-module.exports = { buildGraph, dijkstra, findOptimalRoute };
+module.exports = {
+  calculateDistance,
+  buildGraphWithDriver,
+  dijkstra,
+  getShortestRoute
+};

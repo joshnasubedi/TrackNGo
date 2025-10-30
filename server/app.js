@@ -82,6 +82,64 @@ app.get("/api/driver-location", (req, res) => {
   });
 });
 
+// Add this NEW route - Driver to specific pickup point shortest route
+app.get("/api/shortest-route", (req, res) => {
+  try {
+    const { driverLat, driverLng, targetIndex } = req.query;
+    
+    if (!driverLat || !driverLng || targetIndex === undefined) {
+      return res.status(400).json({ error: "Missing required parameters: driverLat, driverLng, targetIndex" });
+    }
+    
+    const driverLocation = {
+      lat: parseFloat(driverLat),
+      lng: parseFloat(driverLng)
+    };
+    
+    const targetIdx = parseInt(targetIndex);
+    
+    if (targetIdx < 0 || targetIdx >= pickupPoints.length) {
+      return res.status(400).json({ error: "Invalid target index" });
+    }
+    
+    // Calculate direct distance (simplified for now)
+    const distance = calculateDistance(
+      driverLocation.lat, driverLocation.lng,
+      pickupPoints[targetIdx].lat, pickupPoints[targetIdx].lng
+    );
+    
+    // Return direct path (you can enhance this with your Dijkstra later)
+    const result = {
+      distance: distance.toFixed(2),
+      path: [
+        [driverLocation.lat, driverLocation.lng],
+        [pickupPoints[targetIdx].lat, pickupPoints[targetIdx].lng]
+      ],
+      waypoints: ['driver', `point${targetIdx}`],
+      targetPoint: pickupPoints[targetIdx]
+    };
+    
+    console.log(`📍 Calculated route: ${result.distance} km to ${pickupPoints[targetIdx].name}`);
+    res.json(result);
+    
+  } catch (err) {
+    console.error("Route calculation error:", err);
+    res.status(500).json({ error: "Error calculating shortest route" });
+  }
+});
+
+// Add this helper function at the top with your other imports
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+}
 // API to get shortest path using Dijkstra
 app.get("/shortest-path", (req, res) => {
   try {

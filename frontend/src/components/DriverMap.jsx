@@ -4,14 +4,12 @@ import io from "socket.io-client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// const socket = io("http://localhost:5001");
 const socket = io("http://localhost:5001", {
   transports: ['websocket', 'polling']
 });
 
 console.log("🔌 Driver Map - Socket instance created");
 
-// Add socket connection listeners RIGHT AFTER socket creation
 socket.on('connect', () => {
   console.log("✅✅✅ DRIVER CONNECTED TO SERVER - Socket ID:", socket.id);
 });
@@ -19,8 +17,6 @@ socket.on('connect', () => {
 socket.on('connect_error', (error) => {
   console.log("❌ Driver connection error:", error);
 });
-
-
 
 const PICKUP_POINTS = [
   { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate" },
@@ -41,8 +37,15 @@ const DriverMap = () => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const driverMarkerRef = useRef(null);
-  const initializedRef = useRef(false); // Track initialization
+  const initializedRef = useRef(false);
   const [status, setStatus] = useState("Initializing...");
+  
+  // STATE FOR ROUTE FUNCTIONALITY
+  const [routeInfo, setRouteInfo] = useState(null);
+  const routeLineRef = useRef(null);
+  const [destinationReached, setDestinationReached] = useState(false);
+  const [autoClearTimer, setAutoClearTimer] = useState(null);
+  const [showNextPickup, setShowNextPickup] = useState(false);
 
   // Create bus icon
   const createBusIcon = () => {
@@ -69,8 +72,152 @@ const DriverMap = () => {
     });
   };
 
+  // Function to check if driver reached destination
+  const checkDestinationReached = (driverCoords, targetCoords) => {
+    const distance = calculateDistance(
+      driverCoords.lat, driverCoords.lng,
+      targetCoords.lat, targetCoords.lng
+    );
+    // Consider reached if within 100 meters
+    return distance < 0.1; // 0.1 km = 100 meters
+  };
+
+  // Helper function to calculate distance
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  // Function to calculate route using Dijkstra
+  const calculateRouteToPoint = async (pointIndex) => {
+    // Check if there's already an active route
+    if (routeLineRef.current) {
+      alert("⚠️ Please complete the current pickup first before selecting a new one!");
+      return;
+    }
+
+    if (!driverMarkerRef.current) {
+      alert("Please wait for your location to load");
+      return;
+    }
+
+    try {
+      const driverLatLng = driverMarkerRef.current.getLatLng();
+      console.log("📍 Calculating route from:", driverLatLng, "to point:", pointIndex);
+      
+      const response = await fetch(
+        `http://localhost:5001/api/shortest-route?driverLat=${driverLatLng.lat}&driverLng=${driverLatLng.lng}&targetIndex=${pointIndex}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const routeData = await response.json();
+      console.log("🗺️ Route data received:", routeData);
+      
+      if (routeData.error) {
+        throw new Error(routeData.error);
+      }
+      
+      // Create new route line (blue dashed line)
+      const newRouteLine = L.polyline(routeData.path, {
+        color: '#2563eb',
+        weight: 6,
+        opacity: 0.8,
+        dashArray: '10, 10',
+        lineJoin: 'round'
+      }).addTo(mapInstanceRef.current);
+      
+      // Store the route line in ref
+      routeLineRef.current = newRouteLine;
+      setRouteInfo({
+        distance: routeData.distance,
+        to: PICKUP_POINTS[pointIndex].name,
+        targetCoords: { lat: PICKUP_POINTS[pointIndex].lat, lng: PICKUP_POINTS[pointIndex].lng },
+        pointIndex: pointIndex
+      });
+      
+      // Reset states
+      setDestinationReached(false);
+      setShowNextPickup(false);
+      if (autoClearTimer) {
+        clearTimeout(autoClearTimer);
+        setAutoClearTimer(null);
+      }
+      
+      // Fit map to show entire route
+      mapInstanceRef.current.fitBounds(newRouteLine.getBounds());
+      
+      setStatus(`🚗 Driving to ${PICKUP_POINTS[pointIndex].name}...`);
+      console.log(`📍 Route to ${PICKUP_POINTS[pointIndex].name}: ${routeData.distance} km`);
+      
+    } catch (error) {
+      console.error("❌ Route calculation error:", error);
+      alert("Error calculating route: " + error.message);
+    }
+  };
+
+  // Function to clear route and reset for next pickup
+  const completePickup = () => {
+    console.log("✅ Pickup completed, clearing route...");
+    
+    if (routeLineRef.current) {
+      mapInstanceRef.current.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+    
+    if (autoClearTimer) {
+      clearTimeout(autoClearTimer);
+      setAutoClearTimer(null);
+    }
+    
+    setRouteInfo(null);
+    setDestinationReached(false);
+    setShowNextPickup(false);
+    setStatus("✅ Pickup completed! Ready for next destination.");
+    
+    console.log("🔄 Ready for next pickup");
+  };
+
+  // Function when driver needs more time
+  const needMoreTime = () => {
+    console.log("⏰ Driver needs more time");
+    if (autoClearTimer) {
+      clearTimeout(autoClearTimer);
+      setAutoClearTimer(null);
+    }
+    
+    // Set new timer for 30 seconds
+    const timer = setTimeout(() => {
+      setShowNextPickup(true);
+    }, 30000);
+    
+    setAutoClearTimer(timer);
+    setStatus(`⏰ Waiting at ${routeInfo.to}... (30s)`);
+  };
+
+  // Function to handle destination reached
+  const handleDestinationReached = () => {
+    setDestinationReached(true);
+    setStatus(`🎉 Arrived at ${routeInfo.to}!`);
+    
+    // Auto-show next pickup options after 10 seconds
+    const timer = setTimeout(() => {
+      setShowNextPickup(true);
+    }, 10000);
+    
+    setAutoClearTimer(timer);
+  };
+
   useEffect(() => {
-    // PREVENT DOUBLE INITIALIZATION
     if (initializedRef.current) {
       console.log("🚫 Map already initialized, skipping...");
       return;
@@ -83,7 +230,7 @@ const DriverMap = () => {
 
     try {
       console.log("🚀 Initializing driver map...");
-      initializedRef.current = true; // Mark as initialized immediately
+      initializedRef.current = true;
       setStatus("Creating map...");
       
       // Initialize map
@@ -96,12 +243,48 @@ const DriverMap = () => {
       }).addTo(mapInstanceRef.current);
       console.log("✅ Tile layer added");
 
-      // Add pickup points with DEFAULT markers (should work now)
-      console.log("📍 Adding pickup points...");
+      // Add pickup points with CLICK HANDLERS for routing
+      console.log("📍 Adding pickup points with route functionality...");
       PICKUP_POINTS.forEach((point, index) => {
-        L.marker([point.lat, point.lng]) // Using default marker
+        const popupContent = `
+          <div style="text-align: center; min-width: 150px;">
+            <b>${point.name}</b><br>
+            <small>Pickup Location</small><br>
+            <button id="route-btn-${index}" 
+                    style="background: #3B82F6; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 8px; width: 100%;">
+              🚗 Get Route
+            </button>
+          </div>
+        `;
+
+        const marker = L.marker([point.lat, point.lng])
           .addTo(mapInstanceRef.current)
-          .bindPopup(`<b>${point.name}</b><br>Pickup Location`);
+          .bindPopup(popupContent);
+        
+        // When popup opens, add event listener to the button
+        marker.on('popupopen', () => {
+          const button = document.getElementById(`route-btn-${index}`);
+          if (button) {
+            button.onclick = () => {
+              if (routeLineRef.current) {
+                alert("⚠️ Please complete the current pickup first!");
+                mapInstanceRef.current.closePopup();
+                return;
+              }
+              
+              console.log(`🎯 Route button clicked for: ${point.name}`);
+              calculateRouteToPoint(index);
+              mapInstanceRef.current.closePopup();
+            };
+          }
+        });
+        
+        // Also add click event to marker itself
+        marker.on('click', () => {
+          console.log(`🎯 Marker clicked: ${point.name}`);
+          calculateRouteToPoint(index);
+        });
+        
         console.log(`✅ Added pickup point ${index + 1}`);
       });
 
@@ -110,83 +293,90 @@ const DriverMap = () => {
       // Watch driver's location
       if (navigator.geolocation) {
         console.log("📍 Starting GPS tracking...");
-        //added
-         navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      };
-      console.log("📍 Immediate location found:", coords);
-      setStatus(`🚌 Live tracking active!`);
-      
-      const busIcon = createBusIcon();
-      if (driverMarkerRef.current) {
-        driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
-      } else {
-        driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
-          icon: busIcon 
-        })
-          .addTo(mapInstanceRef.current)
-          .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
-          .openPopup();
-      }
-      mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
-      socket.emit("driverLocation", coords);
-    },
-    (error) => {
-      console.error("❌ Immediate GPS error:", error);
-    },
-    { 
-      enableHighAccuracy: true,
-      timeout: 10000
-    }
-  );
-  //close
         
-      const watchId = navigator.geolocation.watchPosition(
-  (position) => {
-    const coords = {
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-    };
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            console.log("📍 Immediate location found:", coords);
+            setStatus(`🚌 Live tracking active!`);
+            
+            const busIcon = createBusIcon();
+            if (driverMarkerRef.current) {
+              driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
+            } else {
+              driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
+                icon: busIcon 
+              })
+                .addTo(mapInstanceRef.current)
+                .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
+                .openPopup();
+            }
+            mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
+            socket.emit("driverLocation", coords);
+          },
+          (error) => {
+            console.error("❌ Immediate GPS error:", error);
+          },
+          { 
+            enableHighAccuracy: true,
+            timeout: 10000
+          }
+        );
+        
+        const watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const coords = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            
+            // Check if destination is reached when route is active
+            if (routeInfo && routeLineRef.current && !destinationReached) {
+              const reached = checkDestinationReached(coords, routeInfo.targetCoords);
+              if (reached) {
+                console.log("🎉 Destination reached!");
+                handleDestinationReached();
+              } else {
+                const distance = calculateDistance(
+                  coords.lat, coords.lng,
+                  routeInfo.targetCoords.lat, routeInfo.targetCoords.lng
+                );
+                setStatus(`🚗 ${distance.toFixed(2)} km to ${routeInfo.to}`);
+              }
+            }
 
-    console.log("📍 Driver location found:", coords);
-    setStatus(`🚌 Live tracking active!`);
+            const busIcon = createBusIcon();
+            if (driverMarkerRef.current) {
+              driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
+            } else {
+              driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
+                icon: busIcon 
+              })
+                .addTo(mapInstanceRef.current)
+                .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
+                .openPopup();
+            }
 
-    const busIcon = createBusIcon();
+            mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
+            socket.emit("driverLocation", coords);
+          },
+          (error) => {
+            console.error("❌ GPS Error:", error);
+            setStatus("Please allow location access");
+          },
+          { 
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 15000
+          }
+        );
 
-    // Update or create driver marker
-    if (driverMarkerRef.current) {
-      driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
-    } else {
-      driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
-        icon: busIcon 
-      })
-        .addTo(mapInstanceRef.current)
-        .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
-        .openPopup();
-    }
-
-    mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
-    
-    // ⚠️ ADD THIS LINE HERE ⚠️ - Send to parents
-    socket.emit("driverLocation", coords);
-    console.log("📡 Sent location to parents");
-
-  },
-  (error) => {
-    console.error("❌ GPS Error:", error);
-    setStatus("Please allow location access");
-  },
-  { 
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 15000
-  }
-);
-
-        return () => navigator.geolocation.clearWatch(watchId);
+        return () => {
+          navigator.geolocation.clearWatch(watchId);
+        };
       }
 
       // Force map resize
@@ -200,42 +390,98 @@ const DriverMap = () => {
     } catch (error) {
       console.error("❌ Error in DriverMap:", error);
       setStatus(`Error: ${error.message}`);
-      initializedRef.current = false; // Reset on error
+      initializedRef.current = false;
     }
 
     // Cleanup
     return () => {
       console.log("🧹 Cleaning up driver map...");
+      if (routeLineRef.current) {
+        mapInstanceRef.current.removeLayer(routeLineRef.current);
+      }
+      if (autoClearTimer) {
+        clearTimeout(autoClearTimer);
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
       initializedRef.current = false;
     };
-  }, []);
+  }, [routeInfo, destinationReached, autoClearTimer]);
 
-return (
-  <div className="w-full h-full"> {/* Use your existing layout classes */}
-    <div className="p-4 bg-blue-600 text-white lg shadow-lg mb-0"> 
-      <h2 className="text-xl font-bold">🚍 Driver Tracking Active</h2>
-      <p className="mt-2">{status}</p>
-      <p className="text-sm opacity-90 mt-1">
-        Your location is being shared in real time with parents.
-      </p>
-    
+  return (
+    <div className="w-full h-full">
+      <div className="p-4 bg-blue-600 text-white lg shadow-lg mb-0"> 
+        <h2 className="text-xl font-bold">🚍 Driver Dashboard</h2>
+        <p className="mt-2">{status}</p>
+        <p className="text-sm opacity-90 mt-1">
+          Your location is being shared in real time with parents.
+        </p>
+        
+        {/* Destination Reached - Pickup Complete */}
+        {destinationReached && (
+          <div className="bg-green-600 text-white p-3 rounded-lg mt-3">
+            <h3 className="text-lg font-bold mb-1">✅ Pickup Location Reached</h3>
+            <p className="text-sm mb-2">
+              You're at <strong>{routeInfo?.to}</strong>
+            </p>
+            
+            {showNextPickup ? (
+              <div className="space-y-2">
+                <p className="text-yellow-300 text-sm">Ready for next pickup?</p>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={completePickup}
+                    className="bg-green-500 text-white px-3 py-2 rounded flex-1 text-sm hover:bg-green-600 transition"
+                  >
+                    ✅ Complete & Next
+                  </button>
+                  <button 
+                    onClick={needMoreTime}
+                    className="bg-yellow-500 text-white px-3 py-2 rounded flex-1 text-sm hover:bg-yellow-600 transition"
+                  >
+                    ⏰ Need More Time
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-yellow-300 text-sm">
+                Next options will appear in a moment...
+              </p>
+            )}
+          </div>
+        )}
+        
+        {/* Active Route Display */}
+        {routeInfo && !destinationReached && (
+          <div className="bg-blue-500 text-white p-3 rounded-lg mt-3">
+            <h3 className="text-lg font-bold mb-1">🗺️ Active Route</h3>
+            <p className="text-sm">
+              To: <strong>{routeInfo.to}</strong><br/>
+              Distance: <strong>{routeInfo.distance} km</strong>
+            </p>
+            <button 
+              onClick={completePickup}
+              className="bg-red-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
+            >
+              🗑️ Cancel Route
+            </button>
+          </div>
+        )}
+      </div>
+      
+      {/* Map Container */}
+      <div 
+        ref={mapRef} 
+        className="rounded-lg shadow-lg border-2 border-gray-200"
+        style={{ 
+          height: "calc(100vh - 80px)",
+          width: "100%",
+        }} 
+      />
     </div>
-    
-    {/* Map Container - Fixed height that won't break layout */}
-    <div 
-      ref={mapRef} 
-      className="rounded-lg shadow-lg border-2 border-gray-200"
-      style={{ 
-        height: "calc(100vh - 80px)", // Fixed height instead of 100vh
-        width: "100%",
-      }} 
-    />
-  </div>
-);
+  );
 };
 
 export default DriverMap;
