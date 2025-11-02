@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "drivers",
+  "info": {
+    "singularName": "driver",
+    "pluralName": "drivers",
+    "displayName": "Driver"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "Name": {
+      "type": "string"
+    },
+    "Age": {
+      "type": "integer"
+    },
+    "phoneNumber": {
+      "type": "biginteger",
+      "min": "10",
+      "max": "10"
+    },
+    "email": {
+      "type": "email"
+    }
+  }
+}

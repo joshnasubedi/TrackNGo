@@ -12,6 +12,7 @@ import Attendance from './components/Attendance';
 import Layout from "./components/Layout";
 import Layoutdriver from "./components/Layoutdriver";
 import Driversidebar from "./components/Driversidebar";
+import InfoDriver from "./components/InfoDriver";
 import ImageTest from "./components/ImageTest";
 import SimpleMap from "./components/SimpleMap";
 
@@ -25,7 +26,7 @@ function App() {
           <Route index element={<Dashboard />} /> {/* now works as / */}
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="livemap" element={<ParentMap />} />
-
+            <Route path="drivers" element={<InfoDriver />} />
         </Route>
   {/* Routes inside driverlayout  */}
   <Route path="/driver-homepage" element={<Layoutdriver />}>

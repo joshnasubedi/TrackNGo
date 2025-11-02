@@ -25,9 +25,9 @@ const Dashboard = () => {
       }, stepTime);
     };
 
-    animateValue(0, 12, 1000, setBuses);
-    animateValue(0, 15, 1000, setDrivers);
-    animateValue(0, 38, 1000, setParents);
+    animateValue(0, 1, 1000, setBuses);
+    animateValue(0, 1, 1000, setDrivers);
+    animateValue(0, 1, 1000, setParents);
   }, []);
 
   return (
