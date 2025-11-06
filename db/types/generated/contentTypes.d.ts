@@ -400,6 +400,88 @@ export interface ApiAuthAuth extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiBusRouteBusRoute extends Struct.CollectionTypeSchema {
+  collectionName: 'bus_routes';
+  info: {
+    displayName: 'Bus Route';
+    pluralName: 'bus-routes';
+    singularName: 'bus-route';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    bus_number: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    driver: Schema.Attribute.Relation<
+      'oneToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::bus-route.bus-route'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
+    notifications: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    >;
+    pickup_points: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::pickup-point.pickup-point'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    route_status: Schema.Attribute.Enumeration<
+      ['running', 'finished  ', 'stopped']
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiChildChild extends Struct.CollectionTypeSchema {
+  collectionName: 'children';
+  info: {
+    displayName: 'Child';
+    pluralName: 'children';
+    singularName: 'child';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    grade: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::child.child'> &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
+    notifications: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    >;
+    parent: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    pickup_point: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::pickup-point.pickup-point'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiDriverDriver extends Struct.CollectionTypeSchema {
   collectionName: 'drivers';
   info: {
@@ -423,6 +505,7 @@ export interface ApiDriverDriver extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     Name: Schema.Attribute.String;
+    password: Schema.Attribute.String;
     phoneNumber: Schema.Attribute.BigInteger &
       Schema.Attribute.SetMinMax<
         {
@@ -431,6 +514,83 @@ export interface ApiDriverDriver extends Struct.CollectionTypeSchema {
         },
         string
       >;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiNotificationNotification
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'notifications';
+  info: {
+    displayName: 'Notification';
+    pluralName: 'notifications';
+    singularName: 'notification';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    child: Schema.Attribute.Relation<'manyToOne', 'api::child.child'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    > &
+      Schema.Attribute.Private;
+    message: Schema.Attribute.Text;
+    notification_status: Schema.Attribute.Enumeration<
+      ['sent', 'delivered', 'read']
+    >;
+    parent: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    route: Schema.Attribute.Relation<'manyToOne', 'api::bus-route.bus-route'>;
+    timestamp: Schema.Attribute.DateTime;
+    type: Schema.Attribute.Enumeration<
+      ['pickup', 'dropoff', 'delay', 'emergency']
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPickupPointPickupPoint extends Struct.CollectionTypeSchema {
+  collectionName: 'pickup_points';
+  info: {
+    displayName: 'Pickup Point';
+    pluralName: 'pickup-points';
+    singularName: 'pickup-point';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    bus_routes: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::bus-route.bus-route'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    lat: Schema.Attribute.Decimal;
+    lng: Schema.Attribute.Decimal;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::pickup-point.pickup-point'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -893,10 +1053,10 @@ export interface PluginUsersPermissionsUser
   };
   options: {
     draftAndPublish: false;
-    timestamps: true;
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    children: Schema.Attribute.Relation<'oneToMany', 'api::child.child'>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
@@ -913,6 +1073,10 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    notifications: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    >;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
@@ -948,7 +1112,11 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::auth.auth': ApiAuthAuth;
+      'api::bus-route.bus-route': ApiBusRouteBusRoute;
+      'api::child.child': ApiChildChild;
       'api::driver.driver': ApiDriverDriver;
+      'api::notification.notification': ApiNotificationNotification;
+      'api::pickup-point.pickup-point': ApiPickupPointPickupPoint;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

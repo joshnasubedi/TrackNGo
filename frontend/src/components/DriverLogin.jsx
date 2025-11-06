@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const DriverLogin = () => {
-  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [loginData, setLoginData] = useState({ identifier: "", password: "" });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLoginChange = (e) => {
@@ -11,30 +12,46 @@ const DriverLogin = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    
     try {
+      console.log('🚗 Attempting driver login with:', loginData);
+      
       const response = await fetch("http://localhost:1337/api/auth/local", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          identifier: loginData.email,
+          identifier: loginData.identifier,
           password: loginData.password,
         }),
       });
 
+      console.log('📡 Response status:', response.status);
+      
       const data = await response.json();
+      console.log('📦 Full response data:', data);
 
-      if (data.jwt) {
-        localStorage.setItem("jwt", data.jwt);
-        localStorage.setItem("driver", JSON.stringify(data.user));
-        navigate("/driver-dashboard");
+      if (data.jwt && data.user) {
+        console.log('✅ Driver login successful!');
+        
+        // Save with DRIVER-specific keys
+        localStorage.setItem("driver_token", data.jwt);
+        localStorage.setItem("driver_user", JSON.stringify(data.user));
+        
+        console.log('🔄 Navigating to /driver-homepage...');
+        navigate("/driver-homepage");
+        
       } else {
+        console.log('❌ Login failed:', data.error);
         alert(data.error?.message || "Invalid login");
       }
     } catch (error) {
       console.error("Login error:", error);
       alert("Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,13 +78,14 @@ const DriverLogin = () => {
         >
           <input
             type="text"
-            name="email"
-            value={loginData.email}
+            name="identifier"
+            value={loginData.identifier}
             onChange={handleLoginChange}
             className="w-full border-b py-2 my-2 outline-none"
             style={{ background: "transparent", borderColor: "#ccc" }}
-            placeholder="Email"
+            placeholder="Email or Username"
             required
+            disabled={loading}
           />
           <input
             type="password"
@@ -78,17 +96,19 @@ const DriverLogin = () => {
             style={{ background: "transparent", borderColor: "#ccc" }}
             placeholder="Password"
             required
+            disabled={loading}
           />
 
           <button
-            className="w-[85%] py-2 px-4 rounded-[30px] mx-auto block mt-6"
+            type="submit"
+            disabled={loading}
+            className="w-[85%] py-2 px-4 rounded-[30px] mx-auto block mt-6 disabled:opacity-50"
             style={{
-              background:
-                "linear-gradient(to right, var(--primary), var(--tertiary))",
+              background: "linear-gradient(to right, var(--primary), var(--tertiary))",
               color: "var(--text)",
             }}
           >
-            Log In
+            {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
       </div>

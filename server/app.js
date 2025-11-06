@@ -211,7 +211,7 @@ app.get("/api/road-route", async (req, res) => {
     res.json(result);
   }
 });
-// API to get optimal route (greedy + Dijkstra combo)
+// API to get optimal route (greedy + Dijkstra )
 app.get("/optimal-route", (req, res) => {
   try {
     const result = findOptimalRoute(school, pickupPoints);
@@ -222,7 +222,6 @@ app.get("/optimal-route", (req, res) => {
   }
 });
 
-// Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ 
     status: "Server is running", 

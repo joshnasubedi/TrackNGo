@@ -18,11 +18,13 @@ socket.on('connect_error', (error) => {
   console.log("❌ Driver connection error:", error);
 });
 
+
+
 const PICKUP_POINTS = [
   { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate" },
   { lat: 27.7200, lng: 85.3200, name: "Child 2 - Park Area" },
   { lat: 27.7150, lng: 85.3280, name: "Child 3 - Main Road" },
-  { lat: 27.7220, lng: 85.3220, name: "Child 4 - Community Center" }
+  { lat: 27.70801, lng: 85.3433, name: "Child 4 - Community Center" }
 ];
 
 // FIX FOR LEAFLET DEFAULT MARKERS
@@ -497,9 +499,9 @@ const DriverMap = () => {
             </p>
             <button 
               onClick={completePickup}
-              className="bg-red-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
+              className="bg-green-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
             >
-              🗑️ Cancel Route
+              Complete Route
             </button>
           </div>
         )}

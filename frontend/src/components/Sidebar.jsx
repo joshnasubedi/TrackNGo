@@ -7,20 +7,12 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
   
-      <h2>🚍 TrackMyBus</h2>
+      <h2>🚍 TrackNGo</h2>
       <Link to="/dashboard">🏠 Dashboard</Link>
-      <Link to="/busroutes">🚌 Bus Routes</Link>
-      <Link to="/drivers">👨‍✈️ Drivers</Link>
-      <Link to="/livemap">📍 Live Map</Link>
-      <Link to="/settings">⚙️ Settings</Link>
-      <Link
-        to="/login"
-        onClick={() => {
-          localStorage.removeItem("user");
-        }}
-      >
-        🚪 Logout
-      </Link>
+      <Link to="/dashboard/busroutes">🚌 Bus Routes</Link>
+      <Link to="/dashboard/drivers">👨‍✈️ Drivers</Link>
+      <Link to="/dashboard/livemap">📍 Live Map</Link>
+    
     </aside>
   );
 };

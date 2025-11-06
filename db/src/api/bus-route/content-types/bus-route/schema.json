@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bus_routes",
+  "info": {
+    "singularName": "bus-route",
+    "pluralName": "bus-routes",
+    "displayName": "Bus Route"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "route_status": {
+      "type": "enumeration",
+      "enum": [
+        "running",
+        "finished  ",
+        "stopped"
+      ]
+    },
+    "pickup_points": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::pickup-point.pickup-point",
+      "inversedBy": "bus_routes"
+    },
+    "driver": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "bus_number": {
+      "type": "string"
+    },
+    "notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::notification.notification",
+      "mappedBy": "route"
+    }
+  }
+}

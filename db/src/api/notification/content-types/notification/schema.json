@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "notifications",
+  "info": {
+    "singularName": "notification",
+    "pluralName": "notifications",
+    "displayName": "Notification"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "parent": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "notifications"
+    },
+    "child": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::child.child",
+      "inversedBy": "notifications"
+    },
+    "route": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::bus-route.bus-route",
+      "inversedBy": "notifications"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "pickup",
+        "dropoff",
+        "delay",
+        "emergency"
+      ]
+    },
+    "message": {
+      "type": "text"
+    },
+    "timestamp": {
+      "type": "datetime"
+    },
+    "notification_status": {
+      "type": "enumeration",
+      "enum": [
+        "sent",
+        "delivered",
+        "read"
+      ]
+    }
+  }
+}

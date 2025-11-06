@@ -1,64 +1,72 @@
-import axios from "axios";
+const API_BASE_URL = 'http://localhost:1337/api';
 
-const params = {};
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` })
+  };
+};
 
-export const fetchDataFromApi = async (url) => {
+// Generic API fetch function
+export const fetchDataFromApi = async (endpoint) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  console.log('🔍 API Debug:');
+  console.log('URL:', url);
+  console.log('Token exists:', !!localStorage.getItem('token'));
+
   try {
-    const { data } = await axios.get(
-      process.env.REACT_APP_DEV_URL + url,
-      params
-    );
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    console.log('🔍 Response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log('🔍 Error response:', errorData);
+      throw new Error(errorData.error?.message || `API error: ${response.status}`);
+    }
+
+    const data = await response.json();
     return data;
-  } catch (err) {
-    console.log(err);
-    return err;
+  } catch (error) {
+    console.error('API fetch error:', error);
+    throw error;
   }
 };
 
-export const postDataToApi = async (url, formData) => {
+// Generic API post function
+export const postDataToApi = async (endpoint, data) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  console.log('📤 API POST Debug:');
+  console.log('URL:', url);
+  console.log('Data:', JSON.stringify(data, null, 2));
+
   try {
-    const { data } = await axios.post(
-      process.env.REACT_APP_DEV_URL + url,
-      formData
-    );
-    console.log(data); // This will execute before returning the data
-    return data;
-  } catch (err) {
-    console.error("Error posting data to API:", err);
-    throw err; // Rethrow the error for better error handling
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    console.log('🔍 POST Response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log('🔍 FULL POST Error response:', errorData);
+      console.log('🔍 Error details:', errorData.error?.details);
+      throw new Error(errorData.error?.message || `API error: ${response.status}`);
+    }
+
+    const responseData = await response.json();
+    return responseData;
+  } catch (error) {
+    console.error('API post error:', error);
+    throw error;
   }
-};
-const params_delete = {
-  method: "DELETE",
-  headers: {
-    Authorization: "Bearer " + process.env.REACT_APP_STRIPE_APP_KEY,
-  },
-};
-
-export const removeDataFromApi = async (url) => {
-  try {
-    const data = await axios.delete(
-      process.env.REACT_APP_DEV_URL + url,
-      params_delete
-    );
-    return data.data; // return just the response data
-  } catch (err) {
-    console.error("Error deleting data:", err);
-    throw new Error(err.response ? err.response.data : "An error occurred");
-  }
-};
-
-const params_update = {
-  method: "PUT",
-  headers: {
-    Authorization: "Bearer " + process.env.REACT_APP_STRIPE_APP_KEY,
-  },
-};
-
-export const update_data_to_api = async (url, formData) => {
-  const data = await axios.put(process.env.REACT_APP_DEV_URL + url, {
-    data: formData,
-  });
-  console.log(data); // This will execute before returning the data
-  return data;
 };

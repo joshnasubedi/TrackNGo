@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pickup_points",
+  "info": {
+    "singularName": "pickup-point",
+    "pluralName": "pickup-points",
+    "displayName": "Pickup Point"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "lat": {
+      "type": "decimal"
+    },
+    "lng": {
+      "type": "decimal"
+    },
+    "address": {
+      "type": "text"
+    },
+    "bus_routes": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::bus-route.bus-route",
+      "mappedBy": "pickup_points"
+    }
+  }
+}

@@ -6,18 +6,11 @@ import './Driverdashboard.css';
 const Driversidebar = () => {
   return (
  <aside className="sidebar">
-        <h2>🚍 TrackMyBus</h2>
+        <h2>🚍 TrackNGo</h2>
         <Link to="/driver-homepage">🏠 Driver Dashboard</Link>
       <Link to="/driver-homepage/livemap">📍 Live Map</Link>
         <Link to="/driver-homepage/attendance">✅ Take Attendance</Link>
-        <Link
-          to="/driver-login"
-          onClick={() => {
-            localStorage.removeItem("driver");
-          }}
-        >
-          🚪 Logout
-        </Link>
+        
     </aside>
   );
 };
