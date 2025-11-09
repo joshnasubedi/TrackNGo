@@ -154,20 +154,22 @@ const ParentMap = () => {
     };
   }, []);
 
-  return (
-    <div style={{ height: "100vh", width: "100vw", margin: 0, padding: 0 }}>
-      <div style={{ 
-        padding: "15px", 
-        background: "#059669", 
-        color: "white",
-      }}>
-        <h1 style={{ margin: 0, fontSize: "24px" }}>👨‍👩‍👧‍👦 Parent Tracking</h1>
-        <p style={{ margin: "5px 0 0 0", fontSize: "14px" }}>{status}</p>
+ return (
+    <div className="w-full h-full"> {/* CHANGED: Use className instead of inline styles */}
+      <div className="p-4 bg-green-600 text-white shadow-lg mb-0"> {/* CHANGED: Use className */}
+        <h2 className="text-xl font-bold">👨‍👩‍👧‍👦 Parent Tracking</h2> {/* CHANGED: Use className */}
+        <p className="mt-2">{status}</p> {/* CHANGED: Use className */}
+        <p className="text-sm opacity-90 mt-1"> {/* CHANGED: Use className */}
+          Live tracking of your child's school bus
+        </p>
       </div>
+      
+      {/* Map Container - CHANGED: Use className for consistent styling */}
       <div 
         ref={mapRef} 
+        className="rounded-lg shadow-lg border-2 border-gray-200"
         style={{ 
-          height: "calc(100vh - 80px)", 
+          height: "calc(100vh - 80px)",
           width: "100%",
         }} 
       />

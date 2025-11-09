@@ -100,43 +100,67 @@ class NotificationService {
   }
 
   // ⭐⭐ ULTRA SIMPLE HARDCODED FILTERING ⭐⭐
-  ultraSimpleFilter(allNotifications, parentId) {
-    console.log(`🔧 Ultra Simple Filter for Parent ${parentId}`);
+ ultraSimpleFilter(allNotifications, parentId) {
+  console.log(`🔧 Ultra Simple Filter for Parent ${parentId}`);
+  
+  // HARDCODED: Which child IDs belong to which parent
+  const parentChildMapping = {
+    1: [8, 9],    // Parent 1 (kriti_thapa) - Ram's child IDs
+    2: [10],      // Parent 2 (joshna_subedi) - Sita's child ID  
+    3: [11]       // Parent 3 (pratistha_koirala) - Gita's child ID
+  };
+  
+  const childIdsForParent = parentChildMapping[parentId] || [];
+  console.log(`📋 Parent ${parentId} should see notifications for child IDs:`, childIdsForParent);
+  
+  const filtered = allNotifications.filter(notification => {
+    const childId = notification.attributes?.child;
     
-    // HARDCODED: Which child IDs belong to which parent
-    const parentChildMapping = {
-      1: [8, 9],    // Parent 1 (kriti_thapa) - Ram's child IDs
-      2: [10],      // Parent 2 (joshna_subedi) - Sita's child ID  
-      3: [11]       // Parent 3 (pratistha_koirala) - Gita's child ID
-    };
-    
-    const childIdsForParent = parentChildMapping[parentId] || [];
-    console.log(`📋 Parent ${parentId} should see notifications for child IDs:`, childIdsForParent);
-    
-    const filtered = allNotifications.filter(notification => {
-      const childId = notification.attributes?.child;
-      
-      console.log(`🔍 Checking notification ${notification.id}: childId=${childId}, belongs to parent: ${childIdsForParent.includes(childId)}`);
-      
-      return childIdsForParent.includes(childId);
+    // ✅ FIXED: Better debugging and type handling
+    console.log(`🔍 Checking notification ${notification.id}:`, {
+      childId: childId,
+      type: typeof childId,
+      childIdsForParent: childIdsForParent,
+      includes: childIdsForParent.includes(parseInt(childId))
     });
     
-    return filtered;
-  }
-
-  getCurrentParentId() {
-    // ⭐⭐ CHANGE THIS TO TEST DIFFERENT PARENTS ⭐⭐
-    const testParentId = 1; // 1, 2, or 3
+    // Handle both string and number IDs
+    const childIdNum = parseInt(childId);
+    const isMatch = childIdsForParent.includes(childIdNum);
     
-    const parentNames = {
-      1: 'kriti_thapa (Ram)',
-      2: 'joshna_subedi (Sita)', 
-      3: 'pratistha_koirala (Gita)'
-    };
-    
-    console.log(`🧪 TESTING AS: ${parentNames[testParentId]} (ID: ${testParentId})`);
-    return testParentId;
+    return isMatch;
+  });
+  
+  console.log(`✅ Filtered ${filtered.length} notifications for parent ${parentId}`);
+  return filtered;
+}
+ getCurrentParentId() {
+  // ⭐⭐ FIXED: Use actual logged-in user
+  try {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user.id) {
+      console.log(`👤 Using ACTUAL user: ${user.username} (ID: ${user.id})`);
+      return user.id;
+    }
+  } catch (error) {
+    console.error('Error getting user from localStorage:', error);
   }
+  
+  // Fallback - but this should rarely happen
+  console.log('⚠️ No user found in localStorage, checking parent-child mapping...');
+  
+  // Try to find the parent ID based on available notifications
+  const parentNames = {
+    1: 'kriti_thapa (Ram)',
+    2: 'joshna_subedi (Sita)', 
+    3: 'pratistha_koirala (Gita)'
+  };
+  
+  // Use parent 1 as default for testing
+  const testParentId = 1;
+  console.log(`🧪 Using test ID: ${testParentId} (${parentNames[testParentId]})`);
+  return testParentId;
+}
 
   async markAsRead(notificationId) {
     try {
@@ -166,6 +190,99 @@ class NotificationService {
       throw error;
     }
   }
+
+  // ✅ ADD CLEAR NOTIFICATION METHODS HERE
+
+ // src/services/notificationService.js
+
+// Clear all notifications for current user
+async clearAllNotifications() {
+  try {
+    console.log('🗑️ === STARTING CLEAR ALL NOTIFICATIONS ===');
+    
+    const currentParentId = this.getCurrentParentId();
+    console.log('👤 Clearing notifications for parent:', currentParentId);
+    
+    // Get current user's notifications using the SAME method as getUserNotifications
+    console.log('🔄 Getting user notifications...');
+    const userNotifications = await this.getUserNotifications();
+    
+    console.log(`📋 User has ${userNotifications.length} notifications to clear`);
+    
+    if (userNotifications.length === 0) {
+      console.log('✅ No notifications to clear');
+      return { success: true, cleared: 0 };
+    }
+    
+    // Log what we're about to delete
+    console.log('🗑️ NOTIFICATIONS TO DELETE:', userNotifications.map(n => ({
+      id: n.id,
+      message: n.attributes?.message || n.message,
+      childId: n.attributes?.child || n.child
+    })));
+    
+    // Delete each notification
+    console.log('🗑️ Deleting notifications...');
+    let clearedCount = 0;
+    
+    for (const notification of userNotifications) {
+      try {
+        console.log(`🗑️ Deleting notification ${notification.id}...`);
+        await this.deleteNotification(notification.id);
+        clearedCount++;
+        console.log(`✅ Successfully deleted notification ${notification.id}`);
+      } catch (error) {
+        console.error(`❌ Failed to delete notification ${notification.id}:`, error);
+        // Continue with next notification even if one fails
+      }
+    }
+    
+    console.log(`🎉 CLEAR ALL COMPLETE: ${clearedCount}/${userNotifications.length} deleted`);
+    return { 
+      success: true, 
+      cleared: clearedCount,
+      total: userNotifications.length
+    };
+    
+  } catch (error) {
+    console.error('❌ CRITICAL ERROR clearing all notifications:', error);
+    return { success: false, error: error.message };
+  }
+}
+// Delete single notification
+async deleteNotification(notificationId) {
+  try {
+    console.log(`🗑️ === DELETING NOTIFICATION ${notificationId} ===`);
+    
+    // Use the same API method as fetchDataFromApi for consistency
+    const token = localStorage.getItem('token');
+    console.log('🔑 Using token:', token ? 'Yes' : 'No');
+    
+    const response = await fetch(`http://localhost:1337/api/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log(`📡 DELETE Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`❌ DELETE failed: ${response.status} - ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    console.log(`✅ Notification ${notificationId} deleted successfully`);
+    return { success: true };
+    
+  } catch (error) {
+    console.error(`❌ Error deleting notification ${notificationId}:`, error);
+    throw error;
+  }
+}
+
 }
 
 const notificationService = new NotificationService();

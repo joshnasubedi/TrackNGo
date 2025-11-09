@@ -7,7 +7,6 @@ import "leaflet/dist/leaflet.css";
 const socket = io("http://localhost:5001", {
   transports: ['websocket', 'polling']
 });
-
 console.log("🔌 Driver Map - Socket instance created");
 
 socket.on('connect', () => {
@@ -18,13 +17,11 @@ socket.on('connect_error', (error) => {
   console.log("❌ Driver connection error:", error);
 });
 
-
-
 const PICKUP_POINTS = [
   { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate" },
   { lat: 27.7200, lng: 85.3200, name: "Child 2 - Park Area" },
   { lat: 27.7150, lng: 85.3280, name: "Child 3 - Main Road" },
-  { lat: 27.70801, lng: 85.3433, name: "Child 4 - Community Center" }
+  { lat: 27.688485, lng: 85.348518, name: "Child 4 - Community Center" }
 ];
 
 // FIX FOR LEAFLET DEFAULT MARKERS
@@ -99,6 +96,12 @@ const DriverMap = () => {
 
   // Function to calculate route using ACTUAL ROADS
   const calculateRouteToPoint = async (pointIndex) => {
+    // Check if map is ready
+    if (!mapInstanceRef.current) {
+      alert("Map is not ready yet. Please wait...");
+      return;
+    }
+
     // Check if there's already an active route
     if (routeLineRef.current) {
       alert("⚠️ Please complete the current pickup first before selecting a new one!");
@@ -132,22 +135,17 @@ const DriverMap = () => {
         throw new Error(routeData.error);
       }
       
-      // Remove existing route line
+      // Remove existing route line safely (if any)
       if (routeLineRef.current) {
         mapInstanceRef.current.removeLayer(routeLineRef.current);
+        routeLineRef.current = null;
       }
       
-      // Create new route line with different style for road vs straight line
-      const routeStyle = routeData.roadDistance ? {
+      // Create new route line with different style
+      const routeStyle = {
         color: '#2563eb',
         weight: 6,
         opacity: 0.8,
-        lineJoin: 'round'
-      } : {
-        color: '#ef4444',
-        weight: 4,
-        opacity: 0.6,
-        dashArray: '5, 10',
         lineJoin: 'round'
       };
       
@@ -159,59 +157,174 @@ const DriverMap = () => {
           <b>${routeData.roadDistance ? '🛣️ Road Route' : '📏 Straight Line'}</b><br>
           To: <strong>${targetPoint.name}</strong><br>
           Distance: <strong>${routeData.distance} km</strong><br>
-          Est. Time: <strong>${routeData.duration} min</strong><br>
           <small style="color: #6b7280;">
             ${routeData.roadDistance ? 'Actual road path' : 'Direct line (no roads)'}
           </small>
         </div>
-      `);
+      `).openPopup();
       
       // Store the route line in ref
       routeLineRef.current = newRouteLine;
+      
+      // Update route info state
       setRouteInfo({
         distance: routeData.distance,
         duration: routeData.duration,
         to: targetPoint.name,
         targetCoords: { lat: targetPoint.lat, lng: targetPoint.lng },
         pointIndex: pointIndex,
-        isRoadRoute: routeData.roadDistance
+        isRoadRoute: routeData.roadDistance || false
       });
       
-      // Reset states
+      // Reset destination reached state
       setDestinationReached(false);
       setShowNextPickup(false);
+      
+      // Clear any existing auto-clear timer
       if (autoClearTimer) {
         clearTimeout(autoClearTimer);
         setAutoClearTimer(null);
       }
       
-      // Fit map to show entire route
-      mapInstanceRef.current.fitBounds(newRouteLine.getBounds());
+      // Fit map to show both driver and route (don't zoom too close)
+      const routeBounds = newRouteLine.getBounds();
+      const driverBounds = L.latLngBounds([driverLatLng, targetPoint]);
+      const combinedBounds = routeBounds.extend(driverBounds);
+      
+      mapInstanceRef.current.fitBounds(combinedBounds, { 
+        padding: [20, 20],
+        maxZoom: 16 
+      });
       
       const routeType = routeData.roadDistance ? "road route" : "straight line";
-      setStatus(`🚗 Driving to ${targetPoint.name} via ${routeType}...`);
-      console.log(`🛣️ ${routeData.roadDistance ? 'Road' : 'Straight'} route to ${targetPoint.name}: ${routeData.distance} km`);
+      setStatus(`🚗 Route to ${targetPoint.name} calculated (${routeData.distance} km via ${routeType})`);
+      
+      console.log(`🛣️ Route displayed to ${targetPoint.name}: ${routeData.distance} km`);
       
     } catch (error) {
       console.error("❌ Route calculation error:", error);
       alert("Error calculating route: " + error.message);
+      
+      // Fallback: Create a straight line if API fails
+      createFallbackRoute(pointIndex);
     }
+  };
+
+  // Fallback function if the API fails
+  const createFallbackRoute = (pointIndex) => {
+    if (!driverMarkerRef.current || !mapInstanceRef.current) return;
+    
+    const driverLatLng = driverMarkerRef.current.getLatLng();
+    const targetPoint = PICKUP_POINTS[pointIndex];
+    
+    const distance = calculateDistance(
+      driverLatLng.lat, driverLatLng.lng,
+      targetPoint.lat, targetPoint.lng
+    );
+    
+    // Create straight line route
+    const fallbackRoute = L.polyline([
+      [driverLatLng.lat, driverLatLng.lng],
+      [targetPoint.lat, targetPoint.lng]
+    ], {
+      color: '#ef4444',
+      weight: 4,
+      opacity: 0.6,
+      dashArray: '5, 10'
+    }).addTo(mapInstanceRef.current);
+    
+    fallbackRoute.bindPopup(`
+      <div style="text-align: center;">
+        <b>📏 Straight Line Route</b><br>
+        To: <strong>${targetPoint.name}</strong><br>
+        Distance: <strong>${distance.toFixed(2)} km</strong><br>
+        <small style="color: #6b7280;">Direct path (road route unavailable)</small>
+      </div>
+    `).openPopup();
+    
+    routeLineRef.current = fallbackRoute;
+    
+    setRouteInfo({
+      distance: distance.toFixed(2),
+      duration: (distance * 2).toFixed(1),
+      to: targetPoint.name,
+      targetCoords: { lat: targetPoint.lat, lng: targetPoint.lng },
+      pointIndex: pointIndex,
+      isRoadRoute: false
+    });
+    
+    setDestinationReached(false);
+    setStatus(`🚗 Straight line route to ${targetPoint.name} (${distance.toFixed(2)} km)`);
+  };
+
+  // Test function for simple routes (without API calls)
+  const testSimpleRoute = (pointIndex) => {
+    if (!driverMarkerRef.current || !mapInstanceRef.current) {
+      alert("Map or driver location not ready");
+      return;
+    }
+
+    const driverLatLng = driverMarkerRef.current.getLatLng();
+    const targetPoint = PICKUP_POINTS[pointIndex];
+    
+    console.log("🧪 Testing simple route to:", targetPoint.name);
+    
+    // Remove existing route
+    if (routeLineRef.current) {
+      mapInstanceRef.current.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+    
+    // Create simple straight line
+    const testRoute = L.polyline([
+      [driverLatLng.lat, driverLatLng.lng],
+      [targetPoint.lat, targetPoint.lng]
+    ], {
+      color: '#10b981',
+      weight: 5,
+      opacity: 0.7
+    }).addTo(mapInstanceRef.current);
+    
+    testRoute.bindPopup(`<b>TEST ROUTE</b><br>To: ${targetPoint.name}`).openPopup();
+    routeLineRef.current = testRoute;
+    
+    const distance = calculateDistance(
+      driverLatLng.lat, driverLatLng.lng,
+      targetPoint.lat, targetPoint.lng
+    );
+    
+    setRouteInfo({
+      distance: distance.toFixed(2),
+      to: targetPoint.name,
+      targetCoords: { lat: targetPoint.lat, lng: targetPoint.lng },
+      pointIndex: pointIndex,
+      isRoadRoute: false
+    });
+    
+    setDestinationReached(false);
+    setStatus(`🧪 Test route to ${targetPoint.name} (${distance.toFixed(2)} km)`);
+    
+    // Fit map to show route
+    mapInstanceRef.current.fitBounds(testRoute.getBounds());
   };
 
   // Function to clear route and reset for next pickup
   const completePickup = () => {
     console.log("✅ Pickup completed, clearing route...");
     
-    if (routeLineRef.current) {
+    // Remove route line from map
+    if (routeLineRef.current && mapInstanceRef.current) {
       mapInstanceRef.current.removeLayer(routeLineRef.current);
       routeLineRef.current = null;
     }
     
+    // Clear timer
     if (autoClearTimer) {
       clearTimeout(autoClearTimer);
       setAutoClearTimer(null);
     }
     
+    // Reset states
     setRouteInfo(null);
     setDestinationReached(false);
     setShowNextPickup(false);
@@ -234,13 +347,13 @@ const DriverMap = () => {
     }, 30000);
     
     setAutoClearTimer(timer);
-    setStatus(`⏰ Waiting at ${routeInfo.to}... (30s)`);
+    setStatus(`⏰ Waiting at ${routeInfo?.to}... (30s)`);
   };
 
   // Function to handle destination reached
   const handleDestinationReached = () => {
     setDestinationReached(true);
-    setStatus(`🎉 Arrived at ${routeInfo.to}!`);
+    setStatus(`🎉 Arrived at ${routeInfo?.to}!`);
     
     // Auto-show next pickup options after 10 seconds
     const timer = setTimeout(() => {
@@ -250,6 +363,33 @@ const DriverMap = () => {
     setAutoClearTimer(timer);
   };
 
+  // Check destination in real-time (separate from map initialization)
+  useEffect(() => {
+    if (!driverMarkerRef.current || !routeInfo || destinationReached) return;
+
+    const checkLocationInterval = setInterval(() => {
+      if (driverMarkerRef.current && routeInfo && !destinationReached) {
+        const driverCoords = driverMarkerRef.current.getLatLng();
+        const reached = checkDestinationReached(driverCoords, routeInfo.targetCoords);
+        
+        if (reached) {
+          console.log("🎉 Destination reached!");
+          handleDestinationReached();
+          clearInterval(checkLocationInterval);
+        } else {
+          const distance = calculateDistance(
+            driverCoords.lat, driverCoords.lng,
+            routeInfo.targetCoords.lat, routeInfo.targetCoords.lng
+          );
+          setStatus(`🚗 ${distance.toFixed(2)} km to ${routeInfo.to}`);
+        }
+      }
+    }, 3000); // Check every 3 seconds
+
+    return () => clearInterval(checkLocationInterval);
+  }, [routeInfo, destinationReached]);
+
+  // Main map initialization effect
   useEffect(() => {
     if (initializedRef.current) {
       console.log("🚫 Map already initialized, skipping...");
@@ -276,7 +416,36 @@ const DriverMap = () => {
       }).addTo(mapInstanceRef.current);
       console.log("✅ Tile layer added");
 
-      // Add pickup points with CLICK HANDLERS for routing
+      // ========== SOCKET EVENT LISTENERS ==========
+      console.log("🔌 Setting up socket event listeners...");
+      
+      const handleConnect = () => {
+        console.log("✅✅✅ DRIVER CONNECTED TO SERVER - Socket ID:", socket.id);
+        setStatus("✅ Connected to server! Getting location...");
+      };
+
+      const handleDisconnect = () => {
+        console.log("❌ Driver disconnected from server");
+        setStatus("❌ Disconnected from server - Reconnecting...");
+      };
+
+      const handleError = (error) => {
+        console.log("❌ Socket error:", error);
+        setStatus("❌ Connection error - Check console");
+      };
+
+      const handleLocationReceived = (data) => {
+        console.log("✅ Server confirmed location receipt:", data);
+        setStatus(`🚌 Location shared with parents at ${new Date().toLocaleTimeString()}`);
+      };
+
+      // Add event listeners
+      socket.on('connect', handleConnect);
+      socket.on('disconnect', handleDisconnect);
+      socket.on('error', handleError);
+      socket.on('locationReceived', handleLocationReceived);
+
+      // ========== PICKUP POINTS ==========
       console.log("📍 Adding pickup points with route functionality...");
       PICKUP_POINTS.forEach((point, index) => {
         const popupContent = `
@@ -306,7 +475,11 @@ const DriverMap = () => {
               }
               
               console.log(`🎯 Route button clicked for: ${point.name}`);
-              calculateRouteToPoint(index);
+              
+              // Use test function for debugging, or real function for production
+              // testSimpleRoute(index); // Uncomment for testing
+              calculateRouteToPoint(index); // Use this for real routes
+              
               mapInstanceRef.current.closePopup();
             };
           }
@@ -315,7 +488,15 @@ const DriverMap = () => {
         // Also add click event to marker itself
         marker.on('click', () => {
           console.log(`🎯 Marker clicked: ${point.name}`);
-          calculateRouteToPoint(index);
+          
+          if (routeLineRef.current) {
+            alert("⚠️ Please complete the current pickup first!");
+            return;
+          }
+          
+          // Use test function for debugging, or real function for production
+          // testSimpleRoute(index); // Uncomment for testing
+          calculateRouteToPoint(index); // Use this for real routes
         });
         
         console.log(`✅ Added pickup point ${index + 1}`);
@@ -323,42 +504,11 @@ const DriverMap = () => {
 
       setStatus("Map ready! Getting your location...");
 
-      // Watch driver's location
+      // ========== GEOLOCATION TRACKING ==========
       if (navigator.geolocation) {
-        console.log("📍 Starting GPS tracking...");
+        console.log("📍 Starting REAL-TIME GPS tracking...");
         
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const coords = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            console.log("📍 Immediate location found:", coords);
-            setStatus(`🚌 Live tracking active!`);
-            
-            const busIcon = createBusIcon();
-            if (driverMarkerRef.current) {
-              driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
-            } else {
-              driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
-                icon: busIcon 
-              })
-                .addTo(mapInstanceRef.current)
-                .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
-                .openPopup();
-            }
-            mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
-            socket.emit("driverLocation", coords);
-          },
-          (error) => {
-            console.error("❌ Immediate GPS error:", error);
-          },
-          { 
-            enableHighAccuracy: true,
-            timeout: 10000
-          }
-        );
-        
+        // More frequent updates for real-time tracking
         const watchId = navigator.geolocation.watchPosition(
           (position) => {
             const coords = {
@@ -366,82 +516,97 @@ const DriverMap = () => {
               lng: position.coords.longitude,
             };
             
-            // Check if destination is reached when route is active
-            if (routeInfo && routeLineRef.current && !destinationReached) {
-              const reached = checkDestinationReached(coords, routeInfo.targetCoords);
-              if (reached) {
-                console.log("🎉 Destination reached!");
-                handleDestinationReached();
-              } else {
-                const distance = calculateDistance(
-                  coords.lat, coords.lng,
-                  routeInfo.targetCoords.lat, routeInfo.targetCoords.lng
-                );
-                setStatus(`🚗 ${distance.toFixed(2)} km to ${routeInfo.to}`);
-              }
-            }
-
+            console.log("📍 Real-time location update:", coords);
+            setStatus(`🚌 Live tracking active! Lat: ${coords.lat.toFixed(6)}, Lng: ${coords.lng.toFixed(6)}`);
+            
+            // Update driver marker
             const busIcon = createBusIcon();
             if (driverMarkerRef.current) {
               driverMarkerRef.current.setLatLng([coords.lat, coords.lng]);
             } else {
               driverMarkerRef.current = L.marker([coords.lat, coords.lng], { 
-                icon: busIcon 
+                icon: busIcon,
+                zIndexOffset: 1000 // Ensure bus is on top
               })
                 .addTo(mapInstanceRef.current)
-                .bindPopup("<b>🚍 YOUR BUS</b><br>You are here!")
+                .bindPopup("<b>🚍 YOUR BUS</b><br>Real-time location!")
                 .openPopup();
             }
-
-            mapInstanceRef.current.setView([coords.lat, coords.lng], 14);
+            
+            // Smooth pan to new location instead of setView
+            mapInstanceRef.current.panTo([coords.lat, coords.lng], {
+              animate: true,
+              duration: 1
+            });
+            
+            // Emit to server
             socket.emit("driverLocation", coords);
+            console.log("📡 Emitted location to server:", coords);
           },
           (error) => {
             console.error("❌ GPS Error:", error);
-            setStatus("Please allow location access");
+            setStatus("❌ Location access needed for real-time tracking");
           },
           { 
             enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 15000
+            maximumAge: 1000, // More frequent updates
+            timeout: 5000
           }
         );
 
+        // Force map resize
+        setTimeout(() => {
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.invalidateSize();
+            console.log("✅ Map resized");
+          }
+        }, 100);
+
+        // ========== CLEANUP FUNCTION ==========
         return () => {
+          console.log("🧹 Cleaning up driver map...");
+          
+          // Cleanup socket listeners FIRST
+          socket.off('connect', handleConnect);
+          socket.off('disconnect', handleDisconnect);
+          socket.off('error', handleError);
+          socket.off('locationReceived', handleLocationReceived);
+          
+          // Cleanup GPS
           navigator.geolocation.clearWatch(watchId);
+          console.log("🧹 Cleared GPS watch");
+          
+          // Cleanup map elements carefully
+          if (routeLineRef.current && mapInstanceRef.current) {
+            mapInstanceRef.current.removeLayer(routeLineRef.current);
+            routeLineRef.current = null;
+          }
+          
+          if (autoClearTimer) {
+            clearTimeout(autoClearTimer);
+          }
+          
+          // Remove map instance LAST
+          if (mapInstanceRef.current) {
+            try {
+              mapInstanceRef.current.remove();
+            } catch (e) {
+              console.log("⚠️ Map removal error (can be ignored):", e.message);
+            }
+            mapInstanceRef.current = null;
+          }
+          
+          initializedRef.current = false;
+          console.log("🧹 Cleanup completed");
         };
       }
-
-      // Force map resize
-      setTimeout(() => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
-          console.log("✅ Map resized");
-        }
-      }, 100);
 
     } catch (error) {
       console.error("❌ Error in DriverMap:", error);
       setStatus(`Error: ${error.message}`);
       initializedRef.current = false;
     }
-
-    // Cleanup
-    return () => {
-      console.log("🧹 Cleaning up driver map...");
-      if (routeLineRef.current) {
-        mapInstanceRef.current.removeLayer(routeLineRef.current);
-      }
-      if (autoClearTimer) {
-        clearTimeout(autoClearTimer);
-      }
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-      initializedRef.current = false;
-    };
-  }, [routeInfo, destinationReached, autoClearTimer]);
+  }, []); // Empty dependency array - runs only once on mount
 
   return (
     <div className="w-full h-full">
@@ -495,16 +660,18 @@ const DriverMap = () => {
             <p className="text-sm">
               To: <strong>{routeInfo.to}</strong><br/>
               Distance: <strong>{routeInfo.distance} km</strong><br/>
-              Time: <strong>{routeInfo.duration} min</strong><br/>
+             
             </p>
             <button 
               onClick={completePickup}
-              className="bg-green-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
+              className="bg-red-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
             >
-              Complete Route
+              Cancel Route
             </button>
           </div>
         )}
+
+        
       </div>
       
       {/* Map Container */}

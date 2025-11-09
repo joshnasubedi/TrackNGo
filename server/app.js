@@ -28,15 +28,43 @@ let currentDriverLocation = null;
 
 // When user connects (either driver or parent)
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  console.log("Client connected:", socket.id, "Role:", socket.handshake.query.role || "unknown");
 
-  // When driver sends live location
+  // ✅ FIXED: Handle BOTH event names for compatibility
   socket.on("driverLocation", (coords) => {
-    console.log("Received driver location:", coords);
-    currentDriverLocation = coords; // Store the latest location
+    console.log("📍 Received driver location (from React):", coords);
+    currentDriverLocation = coords;
 
-    // Send it to all connected clients (parents)
+    // Send confirmation back to driver
+    socket.emit("locationReceived", { 
+      status: 'success', 
+      time: new Date().toISOString(),
+      message: 'Location received by server'
+    });
+
+    // Broadcast to all parents
     io.emit("locationUpdate", coords);
+    console.log("📡 Broadcasted location to all parents");
+  });
+
+  // ✅ ALSO handle the event from your EJS file for backward compatibility
+  socket.on("send-location", (data) => {
+    console.log("📍 Received driver location (from EJS):", data);
+    const coords = { lat: data.latitude, lng: data.longitude };
+    currentDriverLocation = coords;
+
+    // Send confirmation
+    socket.emit("locationReceived", { 
+      status: 'success', 
+      time: new Date().toISOString() 
+    });
+
+    // Broadcast to parents (using the format EJS expects)
+    socket.broadcast.emit("receive-location", {
+      id: socket.id,
+      latitude: data.latitude,
+      longitude: data.longitude
+    });
   });
 
   // Send current driver location to newly connected parent
@@ -44,6 +72,17 @@ io.on("connection", (socket) => {
     socket.emit("locationUpdate", currentDriverLocation);
     console.log("Sent stored driver location to new client:", currentDriverLocation);
   }
+
+  // notification
+  socket.on("registerParent", (parentId) => {
+    console.log(`Parent ${parentId} registered for notifications`);
+    socket.join(`parent_${parentId}`); // join a room for this parent
+  });
+
+  socket.on("sendNotificationToParent", ({ notificationData, parentId }) => {
+    console.log(`Sending notification to parent ${parentId}:`, notificationData);
+    io.to(`parent_${parentId}`).emit("notification", notificationData);
+  });
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
@@ -58,13 +97,13 @@ app.get("/live", (req, res) => {
   res.render("index", { role });
 });
 
-// Fixed pickup points (children locations)
+// Fixed pickup points (children locations) - ✅ UPDATED to match frontend
 const school = { name: "School", lat: 27.7172, lng: 85.3240 };
 const pickupPoints = [
   { name: "Child 1 - School Gate", lat: 27.7172, lng: 85.3240 },
   { name: "Child 2 - Park Area", lat: 27.7200, lng: 85.3200 },
   { name: "Child 3 - Main Road", lat: 27.7150, lng: 85.3280 },
-  { name: "Child 4 - Community Center", lat: 27.7220, lng: 85.3220 }
+  { name: "Child 4 - Community Center", lat: 27.688485, lng: 85.348518 } // ✅ FIXED: Matches frontend
 ];
 
 // API to get all pickup points (for frontend)
@@ -140,6 +179,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c; // Distance in km
 }
+
 // API to get shortest path using Dijkstra
 app.get("/shortest-path", (req, res) => {
   try {
@@ -211,7 +251,8 @@ app.get("/api/road-route", async (req, res) => {
     res.json(result);
   }
 });
-// API to get optimal route (greedy + Dijkstra )
+
+// API to get optimal route (greedy + Dijkstra)
 app.get("/optimal-route", (req, res) => {
   try {
     const result = findOptimalRoute(school, pickupPoints);
@@ -220,14 +261,6 @@ app.get("/optimal-route", (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Error calculating optimal route" });
   }
-});
-
-app.get("/health", (req, res) => {
-  res.json({ 
-    status: "Server is running", 
-    connectedClients: io.engine.clientsCount,
-    driverLocation: currentDriverLocation 
-  });
 });
 
 // ========== SERVER START ==========

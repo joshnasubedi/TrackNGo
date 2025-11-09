@@ -118,7 +118,7 @@ Check browser console for details.`);
               
               return (
                 <option key={child.id} value={child.id}>
-                  {childName} - {childGrade} (ID: {child.id})
+                  {childName} - {childGrade} 
                 </option>
               );
             })}

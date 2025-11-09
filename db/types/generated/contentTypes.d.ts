@@ -505,7 +505,6 @@ export interface ApiDriverDriver extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     Name: Schema.Attribute.String;
-    password: Schema.Attribute.String;
     phoneNumber: Schema.Attribute.BigInteger &
       Schema.Attribute.SetMinMax<
         {

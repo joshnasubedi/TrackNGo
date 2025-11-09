@@ -10,6 +10,20 @@ export const NotificationProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ✅ DEFINE THIS FUNCTION FIRST
+  const getNotificationData = (notification) => {
+    // Handle both direct properties and attributes structure
+    return {
+      id: notification.id,
+      type: notification.attributes?.type || notification.type,
+      message: notification.attributes?.message || notification.message,
+      timestamp: notification.attributes?.timestamp || notification.timestamp,
+      status: notification.attributes?.notification_status || notification.notification_status || 'sent',
+      child: notification.attributes?.child || notification.child,
+      parent: notification.attributes?.parent || notification.parent
+    };
+  };
+
   // ✅ FIXED: Debug function with safe method calls
   const debugNotificationFlow = () => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -28,19 +42,6 @@ export const NotificationProvider = ({ children }) => {
     console.log('🔔 Active Handlers:', notificationService.messageHandlers?.size || 0);
     console.log('🔄 Is Connected:', notificationService.isConnected);
     console.log('⏰ Last Polled:', new Date().toLocaleTimeString());
-  };
-
-  // SAFE data access function
-  const getNotificationData = (notification) => {
-    return {
-      id: notification.id,
-      type: notification.type || 'general',
-      message: notification.message || 'No message',
-      timestamp: notification.timestamp || new Date().toISOString(),
-      status: notification.notification_status || 'sent',
-      child: notification.child,
-      parent: notification.parent
-    };
   };
 
   // ✅ ADD THIS FUNCTION - For real-time notifications
@@ -91,17 +92,25 @@ export const NotificationProvider = ({ children }) => {
       const userNotifications = await notificationService.getUserNotifications();
       console.log('📦 Raw notifications data:', userNotifications);
       
-      setNotifications(userNotifications);
+      // ✅ SORT NOTIFICATIONS: Newest first (by timestamp)
+      const sortedNotifications = userNotifications.sort((a, b) => {
+        const timeA = new Date(a.attributes?.timestamp || a.timestamp || 0);
+        const timeB = new Date(b.attributes?.timestamp || b.timestamp || 0);
+        return timeB - timeA; // Descending order (newest first)
+      });
       
-      // Calculate unread count - SAFE version
-      const unread = userNotifications.filter(notification => {
+      setNotifications(sortedNotifications);
+      
+      // Calculate unread count
+      const unread = sortedNotifications.filter(notification => {
         const data = getNotificationData(notification);
         return data.status === 'sent';
       }).length;
       
       setUnreadCount(unread);
       
-      console.log(`📊 Loaded ${userNotifications.length} notifications, ${unread} unread`);
+      console.log(`📊 Loaded ${sortedNotifications.length} notifications, ${unread} unread`);
+      
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -126,7 +135,7 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark as read
+  // ✅ DEFINE markAsRead function
   const markAsRead = async (notificationId) => {
     try {
       await notificationService.markAsRead(notificationId);
@@ -148,7 +157,7 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark all as read
+  // ✅ DEFINE markAllAsRead function
   const markAllAsRead = async () => {
     const unreadNotifications = notifications.filter(notif => {
       const data = getNotificationData(notif);
@@ -172,6 +181,146 @@ export const NotificationProvider = ({ children }) => {
       alert('Failed to mark all notifications as read');
     }
   };
+
+const clearAllNotifications = async () => {
+  try {
+    console.log('🗑️ Context: Starting clear all notifications...');
+    
+    // Show loading state
+    setLoading(true);
+    
+    // Get current notifications count for comparison
+    const currentNotificationCount = notifications.length;
+    console.log(`📊 Current notifications: ${currentNotificationCount}`);
+    
+    if (currentNotificationCount === 0) {
+      alert('No notifications to clear');
+      setLoading(false);
+      return;
+    }
+    
+    // Call the clear all service
+    const result = await notificationService.clearAllNotifications();
+    console.log('📊 Clear all result:', result);
+    
+    if (result.success) {
+      if (result.cleared > 0) {
+        // ✅ FIXED: Clear local state immediately without reloading
+        setNotifications([]);
+        setUnreadCount(0);
+        
+        console.log(`✅ Cleared ${result.cleared} notifications`);
+        alert(`✅ Successfully cleared ${result.cleared} notifications`);
+      } else {
+        console.log('ℹ️ No notifications were cleared');
+        
+        // ✅ FIXED: Check if there's a mismatch between local and server state
+        if (currentNotificationCount > 0) {
+          console.log('⚠️ Local has notifications but server says none to clear');
+          console.log('🔄 Reloading to sync state...');
+          await loadNotifications(); // Reload to see actual server state
+        } else {
+          alert('No notifications to clear');
+        }
+      }
+    } else {
+      console.error('❌ Clear all operation failed:', result.error);
+      alert('Failed to clear notifications: ' + result.error);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error clearing all notifications:', error);
+    alert('Failed to clear notifications');
+  } finally {
+    setLoading(false);
+  }
+};
+
+// ✅ FIXED: Clear single notification function
+const clearNotification = async (notificationId) => {
+  try {
+    console.log(`🗑️ Context: Clearing single notification ${notificationId}`);
+    
+    // Remove from UI immediately for better UX
+    const notificationToRemove = notifications.find(n => n.id === notificationId);
+    setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+    
+    // Update unread count if needed
+    if (notificationToRemove) {
+      const data = getNotificationData(notificationToRemove);
+      if (data.status === 'sent') {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    }
+    
+    // Then call the API
+    const result = await notificationService.deleteNotification(notificationId);
+    
+    if (result.success) {
+      console.log(`✅ Notification ${notificationId} cleared successfully`);
+      // Don't reload automatically to prevent reappearing
+    } else {
+      console.error(`❌ Failed to clear notification ${notificationId}`);
+      // If API call failed, reload to restore the notification
+      await loadNotifications();
+      alert('Failed to delete notification');
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error clearing notification ${notificationId}:`, error);
+    // If error, reload to restore the notification
+    await loadNotifications();
+    alert('Failed to delete notification');
+  }
+};
+
+// Add this function to NotificationContext for testing
+const testClearFunctionality = async () => {
+  console.log('🧪 TESTING CLEAR FUNCTIONALITY');
+  
+  // Test 1: Check current notifications
+  console.log('📋 Current notifications:', notifications.length);
+  console.log('📋 Current notifications data:', notifications);
+  
+  // Test 2: Check parent ID
+  const user = JSON.parse(localStorage.getItem('user'));
+  console.log('👤 Current user:', user);
+  
+  // Test 3: Try to clear one notification manually
+  if (notifications.length > 0) {
+    const firstNotification = notifications[0];
+    console.log('🧪 Testing clear on notification:', firstNotification);
+    
+    // Test the API call directly
+    try {
+      const token = localStorage.getItem('token');
+      console.log('🔑 Token available:', !!token);
+      
+      const response = await fetch(`http://localhost:1337/api/notifications/${firstNotification.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('🧪 Direct API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
+      if (response.ok) {
+        console.log('🧪 DIRECT DELETE SUCCESS!');
+      } else {
+        const errorText = await response.text();
+        console.log('🧪 DIRECT DELETE FAILED:', errorText);
+      }
+    } catch (error) {
+      console.error('🧪 DIRECT DELETE ERROR:', error);
+    }
+  }
+};
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -205,8 +354,8 @@ export const NotificationProvider = ({ children }) => {
         console.error('❌ Failed to connect to notification service');
       }
 
-      // Refresh notifications every 30 seconds as backup
-      const interval = setInterval(loadNotifications, 30000);
+      // ✅ FIXED: Reduce refresh interval to prevent reappearing notifications
+      const interval = setInterval(loadNotifications, 60000); // 1 minute instead of 30 seconds
 
       return () => {
         console.log('🧹 Cleaning up notification system');
@@ -229,7 +378,9 @@ export const NotificationProvider = ({ children }) => {
     markAllAsRead,
     loadNotifications,
     refreshNotifications: loadNotifications,
-    addNotification
+    addNotification,
+    clearAllNotifications,
+    clearNotification
   };
 
   return (
