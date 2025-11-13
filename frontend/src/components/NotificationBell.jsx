@@ -128,17 +128,7 @@ const handleClearAll = async () => {
               >
                 🔄
               </button>
-              
-              {/* ✅ ADD CLEAR ALL BUTTON */}
-              {notifications.length > 0 && (
-                <button
-                  onClick={() => setShowClearConfirm(true)}
-                  className="text-sm text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                  title="Clear All"
-                >
-                  🗑️
-                </button>
-              )}
+          
               
             
             </div>
@@ -234,12 +224,7 @@ const handleClearAll = async () => {
               <span className="text-xs text-gray-600">
                 {notifications.length} total, {unreadCount} unread
               </span>
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="text-xs text-red-600 hover:text-red-800 hover:bg-red-100 px-2 py-1 rounded"
-              >
-                Clear All
-              </button>
+            
             </div>
           )}
         </div>

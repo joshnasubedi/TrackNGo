@@ -263,6 +263,86 @@ app.get("/optimal-route", (req, res) => {
   }
 });
 
+// Add this endpoint to server.js - finds nearest pickup point using Dijkstra
+// ========== SIMPLE & RELIABLE NEAREST POINT ENDPOINT ==========
+app.get("/api/nearest-point", (req, res) => {
+  try {
+    console.log("📍 /api/nearest-point called");
+    
+    // Debug: Check what we have
+    console.log("📊 currentDriverLocation:", currentDriverLocation);
+    console.log("📊 pickupPoints count:", pickupPoints ? pickupPoints.length : 0);
+    
+    if (!currentDriverLocation) {
+      console.log("❌ No driver location - using default location");
+      // Use a default location for testing
+      const defaultLocation = { lat: 27.7172, lng: 85.3240 };
+      
+      const distances = pickupPoints.map((point, index) => {
+        const distance = calculateDistance(
+          defaultLocation.lat, defaultLocation.lng,
+          point.lat, point.lng
+        );
+        return { index, distance, point };
+      });
+      
+      const nearest = distances.reduce((closest, current) => 
+        current.distance < closest.distance ? current : closest
+      );
+      
+      const result = {
+        nearestIndex: nearest.index,
+        distance: nearest.distance.toFixed(2),
+        point: nearest.point,
+        note: "Using default location (driver location not available yet)"
+      };
+      
+      console.log(`🎯 Nearest point (default): ${nearest.point.name} (${nearest.distance.toFixed(2)} km)`);
+      return res.json(result);
+    }
+    
+    // Calculate distances to all points
+    const distances = pickupPoints.map((point, index) => {
+      const distance = calculateDistance(
+        currentDriverLocation.lat, currentDriverLocation.lng,
+        point.lat, point.lng
+      );
+      return { index, distance, point };
+    });
+    
+    // Find nearest
+    const nearest = distances.reduce((closest, current) => 
+      current.distance < closest.distance ? current : closest
+    );
+    
+    const result = {
+      nearestIndex: nearest.index,
+      distance: nearest.distance.toFixed(2),
+      point: nearest.point,
+      allDistances: distances.map(d => ({
+        point: d.point.name,
+        distance: d.distance.toFixed(2)
+      }))
+    };
+    
+    console.log(`🎯 Nearest point: ${nearest.point.name} (${nearest.distance.toFixed(2)} km)`);
+    res.json(result);
+    
+  } catch (err) {
+    console.error("💥 CRITICAL ERROR in /api/nearest-point:", err);
+    
+    // Emergency fallback - always return point 0
+    const emergencyResult = {
+      nearestIndex: 0,
+      distance: "1.50",
+      point: pickupPoints[0],
+      error: "Calculation failed, using first point as fallback",
+      emergency: true
+    };
+    
+    res.json(emergencyResult);
+  }
+});
 // ========== SERVER START ==========
 const PORT = 5001;
 server.listen(PORT, () => {

@@ -9,9 +9,8 @@ const RoutesInfo = () => {
       name: "School Route",
       driver: "Krishna Rai",
       busNumber: "BA 1 PA 1234",
-      startTime: "07:30 AM",
-      endTime: "08:45 AM",
       status: "active",
+      driver_age:32,
       students: 4,
       pickupPoints: [
         { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate", time: "07:30 AM" },
@@ -136,8 +135,8 @@ const RoutesInfo = () => {
                 <div className="info-card">
                   <i className="fas fa-clock"></i>
                   <div>
-                    <h4>Schedule</h4>
-                    <p>{selectedRoute.startTime} - {selectedRoute.endTime}</p>
+                    <h4>Age</h4>
+                    <p>{selectedRoute.driver_age}</p>
                   </div>
                 </div>
               </div>

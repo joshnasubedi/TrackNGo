@@ -12,7 +12,7 @@ const DriverNotificationSender = () => {
   useEffect(() => {
     const fetchRouteChildren = async () => {
       try {
-        const response = await fetchDataFromApi('/children?populate=*');
+        const response = await fetchDataFromApi('/children?populate=parent');
         setChildren(response.data || []);
         console.log('👶 ALL CHILDREN:', response.data);
         
@@ -30,60 +30,63 @@ const DriverNotificationSender = () => {
   }, []);
 
   const sendNotification = async () => {
-    if (!selectedChild) {
-      alert('Please select a child');
+  if (!selectedChild) {
+    alert('Please select a child');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const child = children.find(c => c.id === parseInt(selectedChild));
+    if (!child) {
+      alert('Child not found');
       return;
     }
 
-    setLoading(true);
-    try {
-      const child = children.find(c => c.id === parseInt(selectedChild));
-      
-      if (!child) {
-        alert('Child not found');
-        return;
-      }
+    const childName = child.attributes?.name || child.name;
+    const childId = child.id;
 
-      const childName = child.attributes?.name || child.name;
-      const childId = child.id;
-      
-      console.log(`🚨 SENDING FOR: ${childName} (ID: ${childId})`);
-      
-      const message = customMessage || getDefaultMessage(childName, notificationType);
-      
-      // ⭐⭐ VERIFY THE DATA ⭐⭐
-      const notificationData = {
-        data: {
-          child: parseInt(selectedChild), // ⭐⭐ THIS IS CRITICAL ⭐⭐
-          type: notificationType,
-          message: message,
-          timestamp: new Date().toISOString(),
-          notification_status: 'sent'
-        }
-      };
-
-      console.log('📤 NOTIFICATION DATA BEING SENT:', notificationData);
-      
-      const response = await postDataToApi('/notifications', notificationData);
-      console.log('✅ API RESPONSE:', response);
-      
-      alert(`✅ Notification sent for ${childName} (ID: ${childId})!
-      
-Check browser console for details.`);
-      
-      setSelectedChild('');
-      setCustomMessage('');
-      
-    } catch (error) {
-      console.error('❌ Error sending notification:', error);
-      alert('Failed to send notification: ' + error.message);
-    } finally {
-      setLoading(false);
+    // ✅ Get the parent ID from the populated data
+    const parentId = child.attributes?.parent?.data?.id;
+    if (!parentId) {
+      alert(`No parent found for ${childName}`);
+      return;
     }
-  };
+
+    console.log(`🚨 Sending notification for ${childName} to parent ${parentId}`);
+
+    const message = customMessage || getDefaultMessage(childName, notificationType);
+
+    // ✅ Include parent ID in notification data
+    const notificationData = {
+      data: {
+        child: childId,
+        parent: parentId,  // 🎯 THIS IS THE KEY CHANGE
+        type: notificationType,
+        message: message,
+        timestamp: new Date().toISOString(),
+        notification_status: 'sent',
+      },
+    };
+
+    console.log('📤 Sending notification data:', notificationData);
+    const response = await postDataToApi('/notifications', notificationData);
+    console.log('✅ API response:', response);
+
+    alert(`✅ Notification sent for ${childName} to parent ${parentId}!`);
+
+    setSelectedChild('');
+    setCustomMessage('');
+  } catch (error) {
+    console.error('❌ Error sending notification:', error);
+    alert('Failed to send notification: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const getDefaultMessage = (childName, type) => {
-    // ⭐⭐ MAKE SURE CHILD NAME IS IN MESSAGE ⭐⭐
     const messages = {
       pickup: `Your child ${childName} has been picked up from school`,
       dropoff: `Your child ${childName} has been dropped off at school`, 

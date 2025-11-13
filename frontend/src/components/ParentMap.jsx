@@ -10,7 +10,7 @@ const PICKUP_POINTS = [
   { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate" },
   { lat: 27.7200, lng: 85.3200, name: "Child 2 - Park Area" },
   { lat: 27.7150, lng: 85.3280, name: "Child 3 - Main Road" },
-  { lat: 27.7220, lng: 85.3220, name: "Child 4 - Community Center" }
+  { lat: 27.688485, lng: 85.348518, name: "Child 4 - Community Center" }
 ];
 
 // FIX FOR LEAFLET DEFAULT MARKERS
@@ -79,23 +79,23 @@ const ParentMap = () => {
           .bindPopup(`<b>${point.name}</b><br>Pickup Location`);
       });
 
-      console.log("✅ Pickup points added");
+      console.log(" Pickup points added");
       setStatus("Map ready! Connecting to driver...");
 
       // Socket connection events
       socket.on('connect', () => {
-        console.log("✅ Parent connected to server");
+        console.log("Parent connected to server");
         setStatus("Connected to server! Waiting for driver...");
       });
 
       socket.on('disconnect', () => {
-        console.log("❌ Parent disconnected from server");
+        console.log(" Parent disconnected from server");
         setStatus("Disconnected from server");
       });
 
       // Listen for driver location
       socket.on("locationUpdate", (coords) => {
-        console.log("📍 Parent received driver location:", coords);
+        console.log(" Parent received driver location:", coords);
         setStatus(`🚌 Driver connected! Tracking live location.`);
         
         if (!mapInstanceRef.current) return;
@@ -135,7 +135,7 @@ const ParentMap = () => {
       }, 100);
 
     } catch (error) {
-      console.error("❌ Error in ParentMap:", error);
+      console.error(" Error in ParentMap:", error);
       setStatus(`Error: ${error.message}`);
       initializedRef.current = false;
     }

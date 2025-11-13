@@ -17,53 +17,23 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { notifications, unreadCount, addNotification, refreshNotifications } = useNotifications();
 
-  // HARDCODED PARENT-CHILD MAPPING
-  const parentChildMapping = {
-    'kriti_thapa': ['Ram'],
-    'joshna_subedi': ['Sita'],
-    'pratistha_koirala': ['Gita']
-  };
+ console.log('Logged-in user:', JSON.stringify(user));
 
-  // HARDCODED PICKUP POINT MAPPING
-  const pickupPointMapping = {
-    'Ram': 'School Main Gate',
-    'Sita': 'Park Area',
-    'Gita': 'Main Road Entrance'
-  };
 
-  // Test Notification Button Component
-  const TestNotificationButton = () => {
-    const testNotification = () => {
-      const testNotif = {
-        id: Date.now(), // temporary ID
-        message: "🧪 TEST: Your child has been picked up from school",
-        type: "pickup",
-        timestamp: new Date().toISOString(),
-        notification_status: "sent",
-        child: { name: "Test Child" }
-      };
-      
-      console.log('🧪 Sending test notification:', testNotif);
-      addNotification(testNotif);
-      alert('Test notification sent! Check if it appears in notifications.');
-    };
+  // const parentChildMapping = {
+  //   'kriti_thapa': ['Ram'],
+  //   'joshna_subedi': ['Sita'],
+  //   'pratistha_koirala': ['Gita'],
+  //   'ishtu': ['shrutishrestha']
+  // };
 
-    return (
-      <button 
-        onClick={testNotification}
-        style={{
-          background: '#10b981',
-          color: 'white',
-          border: 'none',
-          padding: '0.5rem 1rem',
-          borderRadius: '6px',
-          cursor: 'pointer'
-        }}
-      >
-        🧪 Test Notification
-      </button>
-    );
-  };
+  // const pickupPointMapping = {
+  //   'Ram': 'School Main Gate',
+  //   'Sita': 'Park Area',
+  //   'Gita': 'Main Road Entrance',
+  // 'ishtu': 'Community Center'
+
+  // };
 
   // Check Strapi Notifications Function
   const checkStrapiNotifications = async () => {
@@ -89,50 +59,7 @@ const Dashboard = () => {
     }
   };
 
-  const fetchChildren = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      console.log('👤 Current user:', user?.username);
-      
-      const response = await fetchDataFromApi('/children?populate=*');
-      let childrenData = response.data || response || [];
-      
-      console.log('📦 All children from API:', childrenData);
-      
-      // Filter children based on hardcoded mapping
-      const myChildren = childrenData.filter(child => {
-        const childName = child.name || child.attributes?.name;
-        const userChildren = parentChildMapping[user?.username] || [];
-        const isMyChild = userChildren.includes(childName);
-        
-        console.log(`🔍 Checking child ${childName}:`, {
-          belongsToUser: isMyChild,
-          userChildren: userChildren
-        });
-        
-        return isMyChild;
-      }).map(child => {
-        const childName = child.name || child.attributes?.name;
-        return {
-          id: child.id,
-          name: childName,
-          grade: child.grade || child.attributes?.grade || 'Not specified',
-          pickup_point: { 
-            name: pickupPointMapping[childName] || 'Not assigned'
-          }
-        };
-      });
-      
-      console.log('✅ My children:', myChildren);
-      setChildren(myChildren);
-      
-    } catch (error) {
-      console.error('❌ Error fetching children:', error);
-      setChildren([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -140,41 +67,76 @@ const Dashboard = () => {
     navigate('/login');
   };
 
-  useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('user'));
-    if (!userData) {
-      navigate('/login');
+useEffect(() => {
+  const userData = JSON.parse(localStorage.getItem("user"));
+  if (!userData) {
+    navigate("/login");
+    return;
+  }
+  setUser(userData);
+
+  const hour = new Date().getHours();
+  if (hour < 12) setGreeting("Good morning 🌅");
+  else if (hour < 17) setGreeting("Good afternoon☀️");
+  else setGreeting("Good evening🌙");
+
+  const animateValue = (start, end, duration, setter) => {
+    let range = end - start;
+    let current = start;
+    let increment = end > start ? 1 : -1;
+    let stepTime = Math.abs(Math.floor(duration / range));
+    const timer = setInterval(() => {
+      current += increment;
+      setter(current);
+      if (current === end) clearInterval(timer);
+    }, stepTime);
+  };
+
+  animateValue(0, 1, 1000, setBuses);
+  animateValue(0, 1, 1000, setDrivers);
+  animateValue(0, 1, 1000, setParents);
+}, [navigate]);
+
+
+useEffect(() => {
+  if (!user) return; // Wait until user is loaded
+  fetchChildren();
+}, [user]);
+
+const fetchChildren = async () => {
+  try {
+    setLoading(true);
+    console.log("👤 Logged-in user:", user);
+
+    const response = await fetch("http://localhost:1337/api/children?populate=parent");
+    const data = await response.json();
+
+    if (!data || !data.data) {
+      console.error("❌ No children data received:", data);
+      setChildren([]);
       return;
     }
-    setUser(userData);
 
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning 🌅");
-    else if (hour < 17) setGreeting("Good afternoon☀️");
-    else setGreeting("Good evening🌙");
+    console.log("📦 All children from API:", data.data);
 
-    const animateValue = (start, end, duration, setter) => {
-      let range = end - start;
-      let current = start;
-      let increment = end > start ? 1 : -1;
-      let stepTime = Math.abs(Math.floor(duration / range));
-      const timer = setInterval(() => {
-        current += increment;
-        setter(current);
-        if (current === end) clearInterval(timer);
-      }, stepTime);
-    };
+    // ✅ Filter only children belonging to this user
+    const myChildren = data.data.filter(
+      (child) => child.parent?.username === user.username
+    );
 
-    animateValue(0, 1, 1000, setBuses);
-    animateValue(0, 1, 1000, setDrivers);
-    animateValue(0, 1, 1000, setParents);
+    console.log("✅ My children:", myChildren);
+    setChildren(myChildren);
+  } catch (error) {
+    console.error("🔥 Error fetching children:", error);
+    setChildren([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-    fetchChildren();
 
-    // ✅ REMOVED: The WebSocket connection is already handled in NotificationContext
-    console.log('✅ Notification system managed by NotificationContext');
 
-  }, [navigate]); // Removed addNotification from dependencies
+
 
   return (
     <div className="page-container" style={{ display: "flex", minHeight: "100vh", background: "var(--background)", color: "var(--text)" }}>
