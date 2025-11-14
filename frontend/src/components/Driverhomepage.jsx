@@ -35,7 +35,7 @@ const Driverhomepage = () => {
       setAttendanceCount(passedCount);
     }
 
-    const socket = io("http://localhost:3000"); // Adjust for your backend
+    const socket = io("http://localhost:5001"); // Adjust for your backend
 
     function sendLocation() {
       if (navigator.geolocation) {

@@ -34,6 +34,7 @@
     flex-direction: column;
     gap: 1.5rem;
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+    /* background-color: #c3601a; */
   }
   
   .layout-container .sidebar h2 {
@@ -42,6 +43,10 @@
     margin-bottom: 1rem;
     font-weight: 600;
     color: white;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    
   }
   
   .layout-container .sidebar a {

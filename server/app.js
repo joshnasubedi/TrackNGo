@@ -1,17 +1,26 @@
+// app.js
 const express = require("express");
 const http = require("http");
 const path = require("path");
 const socketio = require("socket.io");
 const cors = require("cors");
 
-// Import Dijkstra helpers (converted to CommonJS)
-const { buildGraph, dijkstra, findOptimalRoute } = require("./dijkstra");
+// Import roadRouter functions
+const { 
+  nodes, 
+  edges, 
+  findNearestNode, 
+  dijkstra,
+  haversine,
+  getOSRMRoute
+} = require('./roadRouter');
 
+// Create Express app FIRST
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server, {
   cors: {
-    origin: "*", // ✅ Allow all origins during development
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
@@ -21,68 +30,25 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 app.use(express.static(path.join(__dirname, "public")));
 
-// Store driver location for new connections
+// Store current driver location
 let currentDriverLocation = null;
 
 // ========== SOCKET.IO ==========
 
-// When user connects (either driver or parent)
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id, "Role:", socket.handshake.query.role || "unknown");
 
-  // ✅ FIXED: Handle BOTH event names for compatibility
+  // Driver location update
   socket.on("driverLocation", (coords) => {
-    console.log("📍 Received driver location (from React):", coords);
     currentDriverLocation = coords;
-
-    // Send confirmation back to driver
-    socket.emit("locationReceived", { 
-      status: 'success', 
-      time: new Date().toISOString(),
-      message: 'Location received by server'
-    });
-
-    // Broadcast to all parents
-    io.emit("locationUpdate", coords);
-    console.log("📡 Broadcasted location to all parents");
+    socket.emit("locationReceived", { status: "success", time: new Date().toISOString() });
+    io.emit("locationUpdate", coords); // broadcast to parents
   });
 
-  // ✅ ALSO handle the event from your EJS file for backward compatibility
-  socket.on("send-location", (data) => {
-    console.log("📍 Received driver location (from EJS):", data);
-    const coords = { lat: data.latitude, lng: data.longitude };
-    currentDriverLocation = coords;
-
-    // Send confirmation
-    socket.emit("locationReceived", { 
-      status: 'success', 
-      time: new Date().toISOString() 
-    });
-
-    // Broadcast to parents (using the format EJS expects)
-    socket.broadcast.emit("receive-location", {
-      id: socket.id,
-      latitude: data.latitude,
-      longitude: data.longitude
-    });
-  });
-
-  // Send current driver location to newly connected parent
+  // Send current driver location to new clients
   if (currentDriverLocation) {
     socket.emit("locationUpdate", currentDriverLocation);
-    console.log("Sent stored driver location to new client:", currentDriverLocation);
   }
-
-  // notification
-  socket.on("registerParent", (parentId) => {
-    console.log(`Parent ${parentId} registered for notifications`);
-    socket.join(`parent_${parentId}`); // join a room for this parent
-  });
-
-  socket.on("sendNotificationToParent", ({ notificationData, parentId }) => {
-    console.log(`Sending notification to parent ${parentId}:`, notificationData);
-    io.to(`parent_${parentId}`).emit("notification", notificationData);
-  });
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
@@ -91,181 +57,254 @@ io.on("connection", (socket) => {
 
 // ========== ROUTES ==========
 
-// Route for live map (EJS)
+// Render live map page
 app.get("/live", (req, res) => {
-  const role = req.query.role || "parent"; // parent by default
+  const role = req.query.role || "parent";
   res.render("index", { role });
 });
 
-// Fixed pickup points (children locations) - ✅ UPDATED to match frontend
-const school = { name: "School", lat: 27.7172, lng: 85.3240 };
+// Fixed pickup points
 const pickupPoints = [
-  { name: "Child 1 - School Gate", lat: 27.7172, lng: 85.3240 },
-  { name: "Child 2 - Park Area", lat: 27.7200, lng: 85.3200 },
-  { name: "Child 3 - Main Road", lat: 27.7150, lng: 85.3280 },
-  { name: "Child 4 - Community Center", lat: 27.688485, lng: 85.348518 } // ✅ FIXED: Matches frontend
+  { name: "Child 1 - School Gate", lat: 27.6703017, lng: 85.322441 },
+  { name: "Child 2 - Park Area", lat: 27.6902319, lng: 85.3194997 },
+  { name: "Child 3 - Main Road", lat: 27.6976729, lng: 85.325825 },
+  { name: "Child 4 - Community Center", lat: 27.6947084, lng: 85.3401176 }
 ];
 
-// API to get all pickup points (for frontend)
+// API: get all pickup points
 app.get("/api/pickup-points", (req, res) => {
-  res.json({
-    school,
-    pickupPoints
-  });
+  res.json({ pickupPoints });
 });
 
-// API to get current driver location
+// API: current driver location
 app.get("/api/driver-location", (req, res) => {
-  res.json({
-    driverLocation: currentDriverLocation
-  });
+  res.json({ driverLocation: currentDriverLocation });
 });
 
-// Add this NEW route - Driver to specific pickup point shortest route
-app.get("/api/shortest-route", (req, res) => {
+// API: get nearest pickup point USING DIJKSTRA
+app.get("/api/nearest-pickup", async (req, res) => {
   try {
-    const { driverLat, driverLng, targetIndex } = req.query;
+    const { driverLat, driverLng } = req.query;
     
-    if (!driverLat || !driverLng || targetIndex === undefined) {
-      return res.status(400).json({ error: "Missing required parameters: driverLat, driverLng, targetIndex" });
+    if (!driverLat || !driverLng) {
+      return res.status(400).json({ error: "Driver location required" });
     }
     
-    const driverLocation = {
-      lat: parseFloat(driverLat),
-      lng: parseFloat(driverLng)
-    };
+    const driverLatNum = parseFloat(driverLat);
+    const driverLngNum = parseFloat(driverLng);
     
-    const targetIdx = parseInt(targetIndex);
+    console.log(`\n📍 FINDING NEAREST PICKUP POINT USING DIJKSTRA`);
+    console.log(`   Driver at: (${driverLatNum}, ${driverLngNum})`);
     
-    if (targetIdx < 0 || targetIdx >= pickupPoints.length) {
-      return res.status(400).json({ error: "Invalid target index" });
+    const pickupDistances = [];
+    
+    // Calculate distance to each pickup point USING DIJKSTRA
+    for (let i = 0; i < pickupPoints.length; i++) {
+      const point = pickupPoints[i];
+      
+      const startNode = findNearestNode(driverLatNum, driverLngNum);
+      const endNode = findNearestNode(point.lat, point.lng);
+      
+      let distance = Infinity;
+      let algorithm = "Unknown";
+      
+      if (startNode && endNode) {
+        // ALWAYS USE DIJKSTRA FOR DISTANCE CALCULATION
+        const dijkstraResult = dijkstra(startNode, endNode);
+        if (dijkstraResult.roadRoute) {
+          distance = dijkstraResult.distance;
+          algorithm = "Dijkstra";
+        } else if (dijkstraResult.straightLine) {
+          distance = dijkstraResult.distance;
+          algorithm = "Straight Line (Dijkstra Fallback)";
+        }
+      }
+      
+      // If Dijkstra fails completely, use straight line
+      if (distance === Infinity) {
+        distance = haversine(driverLatNum, driverLngNum, point.lat, point.lng);
+        algorithm = "Straight Line (Emergency)";
+      }
+      
+      pickupDistances.push({
+        index: i,
+        point: point,
+        distance: distance,
+        algorithm: algorithm
+      });
+      
+      console.log(`   ${point.name}: ${distance.toFixed(2)}km (${algorithm})`);
     }
     
-    // Calculate direct distance (simplified for now)
-    const distance = calculateDistance(
-      driverLocation.lat, driverLocation.lng,
-      pickupPoints[targetIdx].lat, pickupPoints[targetIdx].lng
+    // Find nearest pickup point
+    const nearest = pickupDistances.reduce((closest, current) => 
+      current.distance < closest.distance ? current : closest
     );
     
-    // Return direct path (you can enhance this with your Dijkstra later)
-    const result = {
-      distance: distance.toFixed(2),
-      path: [
-        [driverLocation.lat, driverLocation.lng],
-        [pickupPoints[targetIdx].lat, pickupPoints[targetIdx].lng]
-      ],
-      waypoints: ['driver', `point${targetIdx}`],
-      targetPoint: pickupPoints[targetIdx]
-    };
+    console.log(`🎯 NEAREST: ${nearest.point.name} - ${nearest.distance.toFixed(2)}km`);
     
-    console.log(`📍 Calculated route: ${result.distance} km to ${pickupPoints[targetIdx].name}`);
-    res.json(result);
+    res.json({
+      nearestPickup: nearest,
+      allPickups: pickupDistances.sort((a, b) => a.distance - b.distance),
+      driverLocation: { lat: driverLatNum, lng: driverLngNum }
+    });
     
   } catch (err) {
-    console.error("Route calculation error:", err);
-    res.status(500).json({ error: "Error calculating shortest route" });
+    console.error("💥 Nearest pickup error:", err);
+    res.status(500).json({ error: "Failed to find nearest pickup: " + err.message });
   }
 });
 
-// Add this helper function at the top with your other imports
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c; // Distance in km
-}
-
-// API to get shortest path using Dijkstra
-app.get("/shortest-path", (req, res) => {
-  try {
-    const { graph, nodes } = buildGraph(school, pickupPoints);
-    const start = 0; // school
-    const end = pickupPoints.length; // last stop
-    const result = dijkstra(graph, start, end);
-    res.json(result);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error calculating shortest path" });
-  }
-});
-
-// Add this new route for actual road routing
 app.get("/api/road-route", async (req, res) => {
   try {
     const { driverLat, driverLng, targetLat, targetLng } = req.query;
-    
-    if (!driverLat || !driverLng || !targetLat || !targetLng) {
-      return res.status(400).json({ error: "Missing required parameters" });
+
+    console.log(`\n🎯 OSRM ROAD ROUTE REQUEST`);
+    console.log(`   From: (${driverLat}, ${driverLng})`);
+    console.log(`   To: (${targetLat}, ${targetLng})`);
+
+    // Validate parameters
+    const driverLatNum = parseFloat(driverLat);
+    const driverLngNum = parseFloat(driverLng);
+    const targetLatNum = parseFloat(targetLat);
+    const targetLngNum = parseFloat(targetLng);
+
+    if (isNaN(driverLatNum) || isNaN(driverLngNum) || isNaN(targetLatNum) || isNaN(targetLngNum)) {
+      return res.status(400).json({ error: "Invalid coordinates" });
     }
 
-    // Use OSRM (Open Source Routing Machine) for real road routing
-    const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${driverLng},${driverLat};${targetLng},${targetLat}?overview=full&geometries=geojson`;
-    
-    console.log("🛣️ Fetching road route from OSRM:", osrmUrl);
-    
-    const response = await fetch(osrmUrl);
-    const routeData = await response.json();
+    let routeResult;
 
-    if (routeData.code !== 'Ok') {
-      throw new Error('OSRM routing failed: ' + routeData.message);
+    routeResult = await getOSRMRoute(driverLatNum, driverLngNum, targetLatNum, targetLngNum);
+    
+    if (!routeResult) {
+      console.log(" OSRM failed, falling back to Dijkstra...");
+      const startNode = findNearestNode(driverLatNum, driverLngNum);
+      const endNode = findNearestNode(targetLatNum, targetLngNum);
+      
+      if (startNode && endNode) {
+        const dijkstraResult = dijkstra(startNode, endNode);
+        if (dijkstraResult.roadRoute) {
+          const latlngs = dijkstraResult.path.map(nodeId => [nodes[nodeId].lat, nodes[nodeId].lon]);
+          routeResult = {
+            distance: dijkstraResult.distance,
+            latlngs: latlngs,
+            roadRoute: true,
+            algorithm: 'Dijkstra',
+            source: 'dijkstra_fallback'
+          };
+        }
+      }
     }
 
-    // Extract the actual road path
-    const roadPath = routeData.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng,lat] to [lat,lng]
-    const distance = (routeData.routes[0].distance / 1000).toFixed(2); // Convert meters to km
+    // Final fallback to straight line
+    if (!routeResult) {
+      console.log("📏 Using straight-line fallback");
+      const straightDistance = haversine(driverLatNum, driverLngNum, targetLatNum, targetLngNum);
+      routeResult = {
+        distance: straightDistance,
+        latlngs: [[driverLatNum, driverLngNum], [targetLatNum, targetLngNum]],
+        roadRoute: false,
+        algorithm: 'Straight Line',
+        source: 'emergency_fallback'
+      };
+    }
 
-    const result = {
-      distance: distance,
-      path: roadPath,
-      duration: (routeData.routes[0].duration / 60).toFixed(1), // minutes
-      roadDistance: true // Flag to indicate this is actual road distance
-    };
+    console.log(`✅ Route computed via ${routeResult.algorithm}: ${routeResult.distance.toFixed(2)}km`);
 
-    console.log(`🛣️ Road route calculated: ${distance} km, ${result.duration} min`);
-    res.json(result);
+    res.json({
+      distance: routeResult.distance.toFixed(2),
+      latlngs: routeResult.latlngs,
+      roadRoute: routeResult.roadRoute,
+      algorithm: routeResult.algorithm,
+      source: routeResult.source,
+      message: routeResult.roadRoute ? 
+        `Road route found using ${routeResult.algorithm}` : 
+        "Direct route (road path not available)"
+    });
 
   } catch (err) {
-    console.error("❌ OSRM routing error:", err);
-    
-    // Fallback to straight line if OSRM fails
-    const driverLat = parseFloat(req.query.driverLat);
-    const driverLng = parseFloat(req.query.driverLng);
-    const targetLat = parseFloat(req.query.targetLat);
-    const targetLng = parseFloat(req.query.targetLng);
-    
-    const distance = calculateDistance(driverLat, driverLng, targetLat, targetLng);
-    
-    const result = {
-      distance: distance.toFixed(2),
-      path: [[driverLat, driverLng], [targetLat, targetLng]],
-      duration: (distance * 2).toFixed(1), // Rough estimate: 2 min per km
-      roadDistance: false // Flag to indicate this is straight line
-    };
-    
-    console.log("🔄 Using fallback straight line route");
-    res.json(result);
+    console.error("💥 ROUTE CALCULATION ERROR:", err);
+    res.status(500).json({ 
+      error: "Internal server error in route calculation",
+      details: err.message
+    });
   }
 });
 
-// API to get optimal route (greedy + Dijkstra)
-app.get("/optimal-route", (req, res) => {
+// API: get nearest pickup point (simple version - for backward compatibility)
+app.get("/api/nearest-point", (req, res) => {
+  if (!currentDriverLocation) return res.status(400).json({ error: "Driver location not available" });
+
+  const distances = pickupPoints.map((point, index) => {
+    const startNode = findNearestNode(currentDriverLocation.lat, currentDriverLocation.lng);
+    const endNode = findNearestNode(point.lat, point.lng);
+    if (!startNode || !endNode) return { index, distance: Infinity, point };
+    const { distance } = dijkstra(startNode, endNode);
+    return { index, distance, point };
+  });
+
+  const nearest = distances.reduce((closest, curr) => curr.distance < closest.distance ? curr : closest);
+  res.json({ nearestIndex: nearest.index, distance: nearest.distance.toFixed(2), point: nearest.point });
+});
+
+// Test endpoint to check if routing system is working
+app.get("/api/test-routing", (req, res) => {
   try {
-    const result = findOptimalRoute(school, pickupPoints);
-    res.json(result);
+    console.log('🧪 Testing routing system...');
+    
+    // Test with known coordinates that should work
+    const testStart = { lat: 27.6703017, lng: 85.322441 }; // Child 1
+    const testEnd = { lat: 27.6902319, lng: 85.3194997 };   // Child 2
+    
+    const startNode = findNearestNode(testStart.lat, testStart.lng);
+    const endNode = findNearestNode(testEnd.lat, testEnd.lng);
+    
+    console.log('Test nodes:', { startNode, endNode });
+    
+    if (!startNode || !endNode) {
+      return res.json({ 
+        success: false,
+        error: "Could not find test nodes",
+        startNode,
+        endNode
+      });
+    }
+    
+    const result = dijkstra(startNode, endNode);
+    
+    res.json({
+      success: true,
+      startNode,
+      endNode,
+      pathLength: result.path ? result.path.length : 0,
+      distance: result.distance,
+      roadRoute: result.roadRoute,
+      straightLine: result.straightLine,
+      error: result.error
+    });
+    
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error calculating optimal route" });
+    console.error('Test error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message
+    });
   }
 });
 
-// ========== SERVER START ==========
+// ✅ REMOVED: The loose functions that were causing syntax errors
+// async getUserNotifications() { ... }
+// async debugParentChildren() { ... }
+// a  // This random 'a' was causing the error
+
+// Start server
 const PORT = 5001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Frontend should connect to: http://localhost:${PORT}`);
+  console.log(`Test endpoints:`);
+  console.log(`  http://localhost:${PORT}/api/pickup-points`);
+  console.log(`  http://localhost:${PORT}/api/nearest-pickup?driverLat=27.7126&driverLng=85.2804`);
+  console.log(`  http://localhost:${PORT}/api/test-routing`);
 });

@@ -28,59 +28,62 @@ const DriverNotificationSender = () => {
     };
     fetchRouteChildren();
   }, []);
+const sendNotification = async () => {
+  if (!selectedChild) {
+    alert('Please select a child');
+    return;
+  }
 
-  const sendNotification = async () => {
-    if (!selectedChild) {
-      alert('Please select a child');
+  setLoading(true);
+  try {
+    const child = children.find(c => c.id === parseInt(selectedChild));
+    
+    if (!child) {
+      alert('Child not found');
       return;
     }
 
-    setLoading(true);
-    try {
-      const child = children.find(c => c.id === parseInt(selectedChild));
-      
-      if (!child) {
-        alert('Child not found');
-        return;
+    const childName = child.attributes?.name || child.name;
+    const childId = child.id;
+    
+    console.log(`🚨 SENDING FOR: ${childName} (ID: ${childId})`);
+    
+    const message = customMessage || getDefaultMessage(childName, notificationType);
+    
+    // ✅✅✅ CRITICAL FIX: Proper child relationship
+    const notificationData = {
+      data: {
+        child: childId, // ⭐⭐ THIS MUST BE SET ⭐⭐
+        type: notificationType,
+        message: message,
+        timestamp: new Date().toISOString(),
+        notification_status: 'sent'
       }
+    };
 
-      const childName = child.attributes?.name || child.name;
-      const childId = child.id;
-      
-      console.log(`🚨 SENDING FOR: ${childName} (ID: ${childId})`);
-      
-      const message = customMessage || getDefaultMessage(childName, notificationType);
-      
-      // ⭐⭐ VERIFY THE DATA ⭐⭐
-      const notificationData = {
-        data: {
-          child: parseInt(selectedChild), // ⭐⭐ THIS IS CRITICAL ⭐⭐
-          type: notificationType,
-          message: message,
-          timestamp: new Date().toISOString(),
-          notification_status: 'sent'
-        }
-      };
-
-      console.log('📤 NOTIFICATION DATA BEING SENT:', notificationData);
-      
-      const response = await postDataToApi('/notifications', notificationData);
-      console.log('✅ API RESPONSE:', response);
-      
-      alert(`✅ Notification sent for ${childName} (ID: ${childId})!
-      
-Check browser console for details.`);
-      
-      setSelectedChild('');
-      setCustomMessage('');
-      
-    } catch (error) {
-      console.error('❌ Error sending notification:', error);
-      alert('Failed to send notification: ' + error.message);
-    } finally {
-      setLoading(false);
+    console.log('📤 NOTIFICATION DATA BEING SENT:', notificationData);
+    
+    const response = await postDataToApi('/notifications', notificationData);
+    console.log('✅ API RESPONSE:', response);
+    
+    // ✅ Verify the child was set
+    if (response.data) {
+      const verifyResponse = await fetchDataFromApi(`/notifications/${response.data.id}?populate=child`);
+      console.log('🔍 VERIFICATION:', verifyResponse);
     }
-  };
+    
+    alert(`✅ Notification sent for ${childName} (ID: ${childId})!`);
+    
+    setSelectedChild('');
+    setCustomMessage('');
+    
+  } catch (error) {
+    console.error('❌ Error sending notification:', error);
+    alert('Failed to send notification: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getDefaultMessage = (childName, type) => {
     // ⭐⭐ MAKE SURE CHILD NAME IS IN MESSAGE ⭐⭐
