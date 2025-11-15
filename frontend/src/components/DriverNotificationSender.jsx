@@ -97,53 +97,104 @@ const response = await postDataToApi('/notifications/send-notification', notific
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold mb-4">Send Notification to Parents</h3>
-      
+<h3 className="text-lg font-semibold mb-4" style={{
+  color: 'var(--primary)'
+}}>
+  Send Notification to Parents
+</h3>      
       
       
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Select Child
-          </label>
-          <select
-            value={selectedChild}
-            onChange={(e) => setSelectedChild(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Choose a child</option>
-            {children.map(child => {
-              const childName = child.attributes?.name || child.name;
-              const childGrade = child.attributes?.grade || child.grade;
-              
-              return (
-                <option key={child.id} value={child.id}>
-                  {childName} - {childGrade} 
-                </option>
-              );
-            })}
-          </select>
-        </div>
+ <div>
+  <label style={{
+    color: 'var(--text)',
+    fontSize: '1rem',
+    fontWeight: '500',
+    display: 'block',
+    marginBottom: '0.5rem'
+  }}>
+    Select Child
+  </label>
+  <select
+    value={selectedChild}
+    onChange={(e) => setSelectedChild(e.target.value)}
+    style={{
+      width: '100%',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      padding: '0.7rem 1rem',
+      fontSize: '1rem',
+      background: 'white',
+      transition: 'all 0.3s ease',
+      outline: 'none',
+      height: '3.5rem'
+    }}
+    onFocus={(e) => {
+      e.target.style.borderColor = 'var(--primary)';
+      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+    }}
+    onBlur={(e) => {
+      e.target.style.borderColor = '#e2e8f0';
+      e.target.style.boxShadow = 'none';
+    }}
+  >
+    <option value="">Choose a child</option>
+    {children.map(child => {
+      const childName = child.attributes?.name || child.name;
+      const childGrade = child.attributes?.grade || child.grade;
+      
+      return (
+        <option key={child.id} value={child.id}>
+          {childName} - {childGrade} 
+        </option>
+      );
+    })}
+  </select>
+</div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Notification Type
-          </label>
-          <select
-            value={notificationType}
-            onChange={(e) => {
-              setNotificationType(e.target.value);
-              setCustomMessage('');
-            }}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="pickup">Picked Up</option>
-            <option value="dropoff">Dropped Off</option>
-            <option value="delay">Delayed</option>
-            <option value="emergency">Emergency</option>
-            <option value="custom">Custom Message</option>
-          </select>
-        </div>
+     <div>
+  <label style={{
+    color: 'var(--text)',
+    fontSize: '1rem',
+    fontWeight: '500',
+    display: 'block',
+    marginBottom: '0.5rem'
+  }}>
+    Notification Type
+  </label>
+  <select
+    value={notificationType}
+    onChange={(e) => {
+      setNotificationType(e.target.value);
+      setCustomMessage('');
+    }}
+    style={{
+      width: '100%',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      padding: '1rem 1rem',
+      fontSize: '1rem',
+      background: 'white',
+      transition: 'all 0.3s ease',
+      outline: 'none',
+      height: '3.5rem'
+    }}
+    onFocus={(e) => {
+      e.target.style.borderColor = 'var(--primary)';
+      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+    }}
+    onBlur={(e) => {
+      e.target.style.borderColor = '#e2e8f0';
+      e.target.style.boxShadow = 'none';
+    }}
+  >
+    <option value="pickup">Picked Up</option>
+    <option value="dropoff">Dropped Off</option>
+    <option value="delay">Delayed</option>
+    <option value="emergency">Emergency</option>
+    <option value="custom">Custom Message</option>
+  </select>
+</div>
 
         {notificationType === 'custom' && (
           <div>

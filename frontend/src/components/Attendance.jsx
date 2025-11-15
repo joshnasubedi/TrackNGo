@@ -5,7 +5,7 @@ import './Dashboard.css'; // Make sure this CSS has fallback colors
 const Attendance = () => {
   const navigate = useNavigate();
 
-  const students = ["Ram", "Hari", "Sita", "Gita"];
+  const students = ["Ram", "Shruti", "Sita", "Gita"];
   const [presentStudents, setPresentStudents] = useState([]);
 
   const toggleAttendance = (student) => {

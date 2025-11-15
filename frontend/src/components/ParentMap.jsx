@@ -7,10 +7,10 @@ import "leaflet/dist/leaflet.css";
 const socket = io("http://localhost:5001"); // Make sure this matches your backend port
 
 const PICKUP_POINTS = [
-  { lat: 27.7172, lng: 85.3240, name: "Child 1 - School Gate" },
-  { lat: 27.7200, lng: 85.3200, name: "Child 2 - Park Area" },
-  { lat: 27.7150, lng: 85.3280, name: "Child 3 - Main Road" },
-  { lat: 27.7220, lng: 85.3220, name: "Child 4 - Community Center" }
+  { lat: 27.6703017, lng: 85.322441, name: "Child 1 - School Gate" },
+  { lat: 27.6902319, lng: 85.3194997, name: "Child 2 - Park Area" },
+  { lat: 27.6976729, lng: 85.325825, name: "Child 3 - Main Road" },
+  { lat: 27.6947084, lng: 85.3401176, name: "Child 4 - Community Center" },
 ];
 
 // FIX FOR LEAFLET DEFAULT MARKERS

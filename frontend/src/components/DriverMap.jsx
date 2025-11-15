@@ -68,6 +68,8 @@ const DriverMap = () => {
     });
   };
 
+ 
+  
   // NEW: Function to calculate nearest pickup point
  const calculateNearestPickup = async (driverCoords) => {
   try {
@@ -158,7 +160,7 @@ const DriverMap = () => {
     const driverLatLng = driverMarkerRef.current.getLatLng();
     const targetPoint = PICKUP_POINTS[pointIndex];
 
-    console.log("📍 Calculating OSRM route from:", driverLatLng, "to:", targetPoint.name);
+    console.log("📍 Calculating route from:", driverLatLng, "to:", targetPoint.name);
 
     // Test backend connection first
     const testResponse = await fetch('http://localhost:5001/api/pickup-points', {
@@ -172,7 +174,6 @@ const DriverMap = () => {
       throw new Error(`Backend server is not responding. Please make sure the server is running on port 5001.`);
     }
 
-    // Now make the actual route request
     const response = await fetch(
       `http://localhost:5001/api/road-route?driverLat=${driverLatLng.lat}&driverLng=${driverLatLng.lng}&targetLat=${targetPoint.lat}&targetLng=${targetPoint.lng}&useOSRM=true`,
       {
@@ -189,7 +190,7 @@ const DriverMap = () => {
     }
 
     const routeData = await response.json();
-    console.log("🛣️ OSRM Route data:", routeData);
+    console.log("🛣️ Route data:", routeData);
 
     if (!routeData.latlngs || routeData.latlngs.length === 0) {
       throw new Error("No route returned from server");
@@ -254,7 +255,7 @@ const DriverMap = () => {
     const bounds = newRouteLine.getBounds().extend(driverLatLng);
     mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30] });
 
-    setStatus(`🚗 ${routeData.algorithm} route to ${targetPoint.name} (${routeData.distance} km)`);
+    setStatus(`🚗 Shortest route to ${targetPoint.name} (${routeData.distance} km)`);
 
   } catch (error) {
     console.error("❌ Route calculation error:", error);
@@ -270,7 +271,6 @@ const DriverMap = () => {
 
   // Function to clear route and reset for next pickup
   const completePickup = () => {
-    console.log("✅ Pickup completed, clearing route...");
     
     // Remove all route layers from map
     if (routeLineRef.current && mapInstanceRef.current) {
@@ -300,7 +300,7 @@ const DriverMap = () => {
       calculateNearestPickup(driverCoords);
     }
     
-    setStatus("✅ Pickup completed! Ready for next destination.");
+    setStatus("Ready for next destination.");
   };
 
   // Function when driver needs more time
@@ -420,7 +420,7 @@ const DriverMap = () => {
             <small>Pickup Location ${index + 1}</small><br>
             <button id="route-btn-${index}" 
                     style="background: #3B82F6; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 8px; width: 100%; font-size: 12px;">
-              🚗 Get OSRM Route
+              🚗 Get Shortest Route
             </button>
           </div>
         `;
@@ -638,23 +638,23 @@ const DriverMap = () => {
         )}
         
         {/* Active Route Display */}
-        {routeInfo && !destinationReached && (
-          <div className={`${routeInfo.isRoadRoute ? 'bg-blue-500' : 'bg-orange-500'} text-white p-3 rounded-lg mt-3`}>
-            <h3 className="text-lg font-bold mb-1 flex items-center">
-              {routeInfo.isRoadRoute ? '🛣️' : '📏'} 
-              {routeInfo.algorithm} Route to {routeInfo.to}
-            </h3>
-            <p className="text-sm">
-              Distance: <strong>{routeInfo.distance} km</strong><br/>
-            </p>
-            <button 
-              onClick={completePickup}
-              className="bg-red-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
-            >
-              Cancel Route
-            </button>
-          </div>
-        )}
+{routeInfo && !destinationReached && (
+  <div className={`${routeInfo.isRoadRoute ? 'bg-blue-500' : 'bg-orange-500'} text-white p-3 rounded-lg mt-3`}>
+    <h3 className="text-lg font-bold mb-1 flex items-center">
+      {routeInfo.isRoadRoute ? '🛣️' : '📏'} 
+      {routeInfo.algorithm && routeInfo.algorithm !== 'undefined' ? `${routeInfo.algorithm} Route` : ' Shortest Route'} to {routeInfo.to}
+    </h3>
+    <p className="text-sm">
+      Distance: <strong>{routeInfo.distance} km</strong><br/>
+    </p>
+    <button 
+      onClick={completePickup}
+      className="bg-red-500 text-white px-3 py-1 rounded mt-2 text-sm hover:bg-red-600 transition"
+    >
+      Cancel Route
+    </button>
+  </div>
+)}
       </div>
       
       {/* Map Container */}

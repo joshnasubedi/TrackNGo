@@ -319,7 +319,7 @@ async debugApiResponse() {
       const token = localStorage.getItem('token');
       console.log('🔑 Using token:', token ? 'Yes' : 'No');
       
-      const response = await fetch(`http://localhost:1337/api/notification/${notificationId}`, {
+      const response = await fetch(`http://localhost:1337/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -10,8 +10,6 @@ const NotificationBell = () => {
     markAllAsRead, 
     loading, 
     refreshNotifications,
-    clearAllNotifications,
-    clearNotification
   } = useNotifications();
   
   const [isOpen, setIsOpen] = useState(false);
@@ -60,30 +58,7 @@ const NotificationBell = () => {
     }
   };
 
-  // ✅ ADD THIS: Handle clear single notification
-  const handleClearNotification = async (notificationId, event) => {
-    event.stopPropagation(); // Prevent marking as read
-    if (window.confirm('Are you sure you want to delete this notification?')) {
-      await clearNotification(notificationId);
-    }
-  };
 
-  // ✅ ADD THIS: Handle clear all notifications
-const handleClearAll = async () => {
-  if (notifications.length === 0) {
-    alert('No notifications to clear');
-    return;
-  }
-  
-  if (window.confirm(`Are you sure you want to clear all ${notifications.length} notifications?`)) {
-    // Close the dropdown first
-    setIsOpen(false);
-    
-    // Then call the clear function
-    await clearAllNotifications();
-    setShowClearConfirm(false);
-  }
-};
 
   // Check if notification is a test notification
   const isTestNotification = (notification) => {
@@ -129,43 +104,13 @@ const handleClearAll = async () => {
                 🔄
               </button>
               
-              {/* ✅ ADD CLEAR ALL BUTTON */}
-              {notifications.length > 0 && (
-                <button
-                  onClick={() => setShowClearConfirm(true)}
-                  className="text-sm text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                  title="Clear All"
-                >
-                  🗑️
-                </button>
-              )}
+            
               
             
             </div>
           </div>
 
-          {/* ✅ ADD CLEAR CONFIRMATION */}
-          {showClearConfirm && (
-            <div className="p-3 bg-yellow-50 border-b">
-              <p className="text-sm text-yellow-800 mb-2">
-                Clear all {notifications.length} notifications?
-              </p>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleClearAll}
-                  className="flex-1 bg-red-500 text-white py-1 px-2 rounded text-sm hover:bg-red-600"
-                >
-                  Yes, Clear All
-                </button>
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-1 px-2 rounded text-sm hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+         
 
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
@@ -189,14 +134,7 @@ const handleClearAll = async () => {
                     } ${isTest ? 'border-l-4 border-l-green-500' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                    {/* ✅ ADD CLEAR BUTTON FOR EACH NOTIFICATION */}
-                    <button
-                      onClick={(e) => handleClearNotification(notification.id, e)}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-opacity"
-                      title="Delete notification"
-                    >
-                      ×
-                    </button>
+                 
                     
                     <div className="flex items-start space-x-3 pr-6">
                       <span className="text-xl">
@@ -234,12 +172,6 @@ const handleClearAll = async () => {
               <span className="text-xs text-gray-600">
                 {notifications.length} total, {unreadCount} unread
               </span>
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="text-xs text-red-600 hover:text-red-800 hover:bg-red-100 px-2 py-1 rounded"
-              >
-                Clear All
-              </button>
             </div>
           )}
         </div>

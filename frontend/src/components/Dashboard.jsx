@@ -344,17 +344,15 @@ const fetchChildren = async () => {
                       alignItems: 'center',
                       gap: '0.5rem'
                     }}>
-                      <span style={{ 
-                        background: 'var(--primary)', 
-                        color: 'white',
-                        borderRadius: '4px',
-                        padding: '0.2rem 0.5rem',
-                        fontSize: '0.8rem'
-                      }}>📍</span>
-                      <strong>Pickup Point:</strong> 
-                      <span style={{ marginLeft: '0.5rem' }}>
-                        {child.pickup_point?.name}
-                      </span>
+                <span style={{ 
+  background: 'var(--secondary)', 
+  color: 'var(--primary)',
+  borderRadius: '4px',
+  height: '1.5rem',
+  padding: '2 rem 2rem',
+  fontSize: '1rem'
+}}>📍 Your child's safety is our priority</span>
+                      
                     </p>
                   </div>
                 </div>
