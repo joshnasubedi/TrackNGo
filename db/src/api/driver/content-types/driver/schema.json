@@ -4,7 +4,8 @@
   "info": {
     "singularName": "driver",
     "pluralName": "drivers",
-    "displayName": "Driver"
+    "displayName": "driver",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true

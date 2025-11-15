@@ -18,14 +18,14 @@
     "@strapi/plugin-cloud": "4.25.22",
     "@strapi/plugin-users-permissions": "4.25.22",
     "@strapi/strapi": "4.25.22",
+    "ajv": "8.12.0",
+    "ajv-draft-04": "1.0.0",
     "better-sqlite3": "11.3.0",
-    "pg": "8.16.2",
+    "pg": "^8.16.2",
     "react": "18.0.0",
     "react-dom": "18.0.0",
     "react-router-dom": "5.3.4",
-    "styled-components": "5.3.6",
-    "ajv": "8.12.0",
-    "ajv-draft-04": "1.0.0"
+    "styled-components": "5.3.6"
   },
   "engines": {
     "node": ">=18.0.0 <=22.x.x",

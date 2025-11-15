@@ -51,19 +51,16 @@ const sendNotification = async () => {
     const message = customMessage || getDefaultMessage(childName, notificationType);
     
     // ✅✅✅ CRITICAL FIX: Proper child relationship
-    const notificationData = {
-      data: {
-        child: childId, // ⭐⭐ THIS MUST BE SET ⭐⭐
-        type: notificationType,
-        message: message,
-        timestamp: new Date().toISOString(),
-        notification_status: 'sent'
-      }
-    };
+ const notificationData = {
+  childId: childId,        // ✅ MUST be "childId" (exact match)
+  type: notificationType,  // ✅
+  message: message,        // ✅
+  // Remove everything else - controller handles timestamp and status
+};
 
     console.log('📤 NOTIFICATION DATA BEING SENT:', notificationData);
     
-    const response = await postDataToApi('/notifications', notificationData);
+const response = await postDataToApi('/notifications/send-notification', notificationData);
     console.log('✅ API RESPONSE:', response);
     
     // ✅ Verify the child was set

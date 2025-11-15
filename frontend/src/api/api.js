@@ -1,8 +1,10 @@
 const API_BASE_URL = 'http://localhost:1337/api';
 
 // Helper function to get auth headers
+// Helper function to get auth headers
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  // Check for driver token first, then regular token
+  const token = localStorage.getItem('driver_token') || localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` })
@@ -70,3 +72,23 @@ export const postDataToApi = async (endpoint, data) => {
     throw error;
   }
 };
+
+//debug
+// Add this to your api.js to debug available endpoints
+export const checkAvailableEndpoints = async () => {
+  try {
+    const response = await fetch('http://localhost:1337/api/content-type-builder/content-types', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    const data = await response.json();
+    console.log('📋 AVAILABLE CONTENT TYPES:', data);
+    return data;
+  } catch (error) {
+    console.error('Error checking content types:', error);
+  }
+};
+
+// Call this in your component to see what's available
+// checkAvailableEndpoints();

@@ -43,99 +43,82 @@ class NotificationService {
     this.status = 'disconnected';
   }
 
-  // ✅ FIXED: Proper function syntax
-  async getUserNotifications() {
-    try {
-
-      console.log('🔔 === STARTING NOTIFICATION FETCH ===');
-      
-      const currentParentId = this.getCurrentParentId();
-      console.log('👤 Current Parent ID:', currentParentId);
-      
-      // STEP 1: First, let's just get ALL notifications to see what we have
-      console.log('🔄 STEP 1: Fetching ALL notifications...');
-      const allNotifications = await fetchDataFromApi('/notifications?populate=*&sort=timestamp:desc');
-      
-      console.log('📦 RAW API RESPONSE:', allNotifications);
-      
-      if (!allNotifications.data || allNotifications.data.length === 0) {
-        console.log('❌ NO NOTIFICATIONS FOUND IN SYSTEM');
-        return [];
-      }
-      
-      console.log(`✅ Found ${allNotifications.data.length} total notifications`);
-      
-      // STEP 2: Log EVERY notification to see REAL data
-      allNotifications.data.forEach((notification, index) => {
-        console.log(`📝 NOTIFICATION ${index + 1}:`, {
-          id: notification.id,
-          attributes: notification.attributes,
-          childId: notification.attributes?.child,
-          message: notification.attributes?.message,
-          hasMessage: !!notification.attributes?.message,
-          messageLength: notification.attributes?.message?.length || 0
-        });
-      });
-      
-      // STEP 3: HARDCODED FILTERING - 100% GUARANTEED TO WORK
-      console.log('🎯 STEP 3: Applying HARDCODED filtering...');
-      
-      // ⭐⭐ ULTRA SIMPLE HARDCODED FILTERING ⭐⭐
-      const filteredNotifications = this.ultraSimpleFilter(allNotifications.data, currentParentId);
-      
-      console.log(`🎉 FINAL: Parent ${currentParentId} sees ${filteredNotifications.length} notifications`);
-      
-      // STEP 4: If still 0, return ALL for debugging
-      if (filteredNotifications.length === 0) {
-        console.log('⚠️ NO FILTERED NOTIFICATIONS, RETURNING ALL FOR DEBUGGING');
-        return allNotifications.data;
-      }
-      
-      return filteredNotifications;
-
-    } catch (error) {
-      console.error('❌ CRITICAL ERROR:', error);
+async getUserNotifications() {
+  try {
+    console.log('🔔 === STARTING NOTIFICATION FETCH ===');
+    
+    const currentParentId = this.getCurrentParentId();
+    console.log('👤 Current Parent ID:', currentParentId);
+    
+    // STEP 1: Fetch notifications
+    console.log('🔄 STEP 1: Fetching notifications...');
+    const response = await fetchDataFromApi('/notifications/get-notifications');
+    
+    console.log('📦 RAW API RESPONSE:', response);
+    
+    // ⭐⭐ FIX: The response is { notifications: [...] } 
+    const notifications = response.notifications || [];
+    
+    console.log(`✅ Found ${notifications.length} notifications from API`);
+    
+    if (notifications.length === 0) {
+      console.log('❌ NO NOTIFICATIONS FOUND IN SYSTEM');
       return [];
     }
+    
+    // STEP 2: Log notifications
+    notifications.forEach((notification, index) => {
+      console.log(`📝 NOTIFICATION ${index + 1}:`, {
+        id: notification.id,
+        message: notification.message,
+        type: notification.type,
+        timestamp: notification.timestamp,
+        status: notification.notification_status,
+        child: notification.child?.name || 'Unknown child'
+      });
+    });
+    
+    // ⭐⭐ FIX: Return the notifications directly - no need for filtering
+    // Your Strapi controller already filters by parent
+    console.log(`🎉 FINAL: Returning ${notifications.length} notifications`);
+    
+    return notifications;
+
+  } catch (error) {
+    console.error('❌ CRITICAL ERROR:', error);
+    return [];
   }
-
-  // ✅ FIXED: Proper function syntax
- // In notificationService.js - REPLACE the ultraSimpleFilter function with this:
-
-// In notificationService.js - UPDATE the ultraSimpleFilter function:
-
-// In notificationService.js - UPDATE the ultraSimpleFilter function:
-
-// ⭐⭐ ULTRA SIMPLE HARDCODED FILTERING ⭐⭐
-ultraSimpleFilter(allNotifications, parentId) {
-  console.log(`🔧 Ultra Simple Filter for Parent ${parentId}`);
-  
-  // ✅ UPDATED: Use ACTUAL child IDs from your system
-  const parentChildMapping = {
-    1: [17, 18],       // Parent 1 - Gita(17) & Ram(18)
-    2: [19, 27],       // Parent 2 - Sita(19) & shrutishrestha(27) - joshna_subedi
-    3: []              // Parent 3 - No children yet
-  };
-  
-  const childIdsForParent = parentChildMapping[parentId] || [];
-  console.log(`📋 Parent ${parentId} should see notifications for child IDs:`, childIdsForParent);
-  
-  const filtered = allNotifications.filter(notification => {
-    const childId = notification.attributes?.child;
-    
-    // Handle both string and number IDs
-    const childIdNum = parseInt(childId);
-    const isMatch = childIdsForParent.includes(childIdNum);
-    
-    console.log(`🔍 Notification ${notification.id} - Child: ${childId} - Match: ${isMatch}`);
-    
-    return isMatch;
-  });
-  
-  console.log(`✅ Filtered ${filtered.length} notifications for parent ${parentId}`);
-  return filtered;
 }
 
+// In notificationService.js - UPDATE the ultraSimpleFilter function:
+// async ultraSimpleFilter(allNotifications, parentId) {
+//   console.log(`🔧 Dynamic Filter for Parent ${parentId}`);
+  
+//   try {
+//     // Get the actual children for this parent from the database
+//     const parentChildren = await fetchDataFromApi(`/children?filters[parent][id][$eq]=${parentId}&fields=id`);
+//     const childIdsForParent = parentChildren.data?.map(child => child.id) || [];
+    
+//     console.log(`📋 Parent ${parentId} has children with IDs:`, childIdsForParent);
+    
+//     const filtered = allNotifications.filter(notification => {
+//       const childId = notification.child?.id;
+//       const isMatch = childIdsForParent.includes(parseInt(childId));
+      
+//       console.log(`🔍 Notification ${notification.id} - Child ID: ${childId} - Match: ${isMatch}`);
+      
+//       return isMatch;
+//     });
+    
+//     console.log(`✅ Filtered ${filtered.length} notifications for parent ${parentId}`);
+//     return filtered;
+    
+//   } catch (error) {
+//     console.error('❌ Error filtering notifications:', error);
+//     // Return all notifications if filtering fails
+//     return allNotifications;
+//   }
+// }
 // Add this method to your NotificationService class in notificationService.js
 async debugFindActualChildIds() {
   try {
@@ -192,6 +175,24 @@ async debugFindParentChildRelationships() {
       console.log('🔍 FIRST CHILD ATTRIBUTES KEYS:', firstChild.attributes ? Object.keys(firstChild.attributes) : 'No attributes');
     }
     
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+  }
+}
+
+//debugg
+// Add this to your notificationService.js for debugging
+async debugApiResponse() {
+  try {
+    console.log('🔍 === DEBUGGING API RESPONSE STRUCTURE ===');
+    const response = await fetchDataFromApi('/notifications/get-notifications');
+    console.log('📦 FULL API RESPONSE:', response);
+    console.log('🔍 Response keys:', Object.keys(response));
+    console.log('🔍 Response has data?:', !!response.data);
+    console.log('🔍 Response has notifications?:', !!response.notifications);
+    console.log('🔍 Is array?:', Array.isArray(response));
+    
+    return response;
   } catch (error) {
     console.error('❌ Debug error:', error);
   }
@@ -318,7 +319,7 @@ async debugFindParentChildRelationships() {
       const token = localStorage.getItem('token');
       console.log('🔑 Using token:', token ? 'Yes' : 'No');
       
-      const response = await fetch(`http://localhost:1337/api/notifications/${notificationId}`, {
+      const response = await fetch(`http://localhost:1337/api/notification/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

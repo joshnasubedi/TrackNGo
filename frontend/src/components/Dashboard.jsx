@@ -17,19 +17,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { notifications, unreadCount, addNotification, refreshNotifications } = useNotifications();
 
-  // HARDCODED PARENT-CHILD MAPPING
-  const parentChildMapping = {
-    'kriti_thapa': ['Ram'],
-    'joshna_subedi': ['Sita'],
-    'pratistha_koirala': ['Gita']
-  };
-
-  // HARDCODED PICKUP POINT MAPPING
-  const pickupPointMapping = {
-    'Ram': 'School Main Gate',
-    'Sita': 'Park Area',
-    'Gita': 'Main Road Entrance'
-  };
+ 
 
   // Test Notification Button Component
   const TestNotificationButton = () => {
@@ -89,51 +77,42 @@ const Dashboard = () => {
     }
   };
 
-  const fetchChildren = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      console.log('👤 Current user:', user?.username);
-      
-      const response = await fetchDataFromApi('/children?populate=*');
-      let childrenData = response.data || response || [];
-      
-      console.log('📦 All children from API:', childrenData);
-      
-      // Filter children based on hardcoded mapping
-      const myChildren = childrenData.filter(child => {
-        const childName = child.name || child.attributes?.name;
-        const userChildren = parentChildMapping[user?.username] || [];
-        const isMyChild = userChildren.includes(childName);
-        
-        console.log(`🔍 Checking child ${childName}:`, {
-          belongsToUser: isMyChild,
-          userChildren: userChildren
-        });
-        
-        return isMyChild;
-      }).map(child => {
-        const childName = child.name || child.attributes?.name;
-        return {
-          id: child.id,
-          name: childName,
-          grade: child.grade || child.attributes?.grade || 'Not specified',
-          pickup_point: { 
-            name: pickupPointMapping[childName] || 'Not assigned'
-          }
-        };
-      });
-      
-      console.log('✅ My children:', myChildren);
-      setChildren(myChildren);
-      
-    } catch (error) {
-      console.error('❌ Error fetching children:', error);
-      setChildren([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchChildren = async () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) throw new Error("No user found in localStorage");
 
+    console.log("👤 My user ID:", user.id);
+
+    const response = await fetchDataFromApi('/children?populate=parent');
+    const allChildren = response.data || []; // ✅ FIX: Remove .data
+
+    console.log("📦 All children from API:", allChildren);
+
+    const myChildren = allChildren.filter(child => {
+      const parentId = child.attributes?.parent?.data?.id;
+      console.log(`Child: ${child.attributes?.name}, Parent ID: ${parentId}`);
+      return parentId === Number(user.id);
+    });
+
+    console.log("✅ My filtered children:", myChildren);
+
+    const formattedChildren = myChildren.map(child => ({
+      id: child.id,
+      name: child.attributes?.name,
+      grade: child.attributes?.grade || "Not specified"
+    }));
+
+    console.log("✅ Formatted children for display:", formattedChildren);
+    setChildren(formattedChildren);
+    
+  } catch (error) {
+    console.error("❌ Error fetching children:", error);
+    setChildren([]);
+  } finally {
+    setLoading(false);
+  }
+};
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -188,7 +167,7 @@ const Dashboard = () => {
               <NotificationBell />
               
               {/* Add Test Notification Button */}
-            
+
               
               <button 
                 onClick={handleLogout}
